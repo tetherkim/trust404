@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRUST404 · 기록 검증</title>
+<style>
+  :root{font-family:system-ui,-apple-system,sans-serif;color:#182625;background:#f3f5f1;line-height:1.6}
+  *{box-sizing:border-box}body{margin:0}main{max-width:1080px;margin:auto;padding:44px 24px}header{border-bottom:1px solid #ccd6cf;padding-bottom:24px}
+  .eyebrow{font-size:12px;letter-spacing:.12em;color:#49675a}h1{font-size:36px;letter-spacing:-.05em;margin:12px 0}h2{font-size:22px;margin:0 0 12px}
+  p{margin:8px 0}.muted{color:#52645d}.badge{background:#dce8dd;padding:5px 10px;border-radius:5px;display:inline-block;font-size:13px}
+  nav{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}button{font:inherit;border:1px solid #b8c9bd;background:white;padding:10px 16px;border-radius:6px;cursor:pointer;color:inherit}
+  button[aria-pressed=true],#run{background:#1a5140;color:white;border-color:#1a5140}button:focus-visible{outline:3px solid #bf813c;outline-offset:3px}button:disabled{opacity:.55;cursor:wait}
+  article{background:white;border:1px solid #d7dfd7;border-radius:12px;padding:26px;margin-bottom:20px}.numbers{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}.numbers div{background:#f3f5f1;padding:14px;border-radius:6px}.numbers strong{display:block;font-size:24px}.numbers span{font-size:13px;color:#52645d}
+  #result{border-left:4px solid #9aa99e;padding-left:18px;margin-top:24px}#result.good{border-color:#31815d}#result.detected{border-color:#b27526}#result.error{border-color:#ba4646}
+  dl{font-size:13px}dt{color:#52645d;margin-top:12px}dd{margin:2px 0;overflow-wrap:anywhere;font-family:ui-monospace,monospace}pre{overflow:auto;max-height:380px;background:#f3f5f1;padding:16px;font-size:12px}summary{cursor:pointer}footer{font-size:13px;color:#52645d}
+  @media(max-width:600px){main{padding:24px 16px}h1{font-size:28px}.numbers{grid-template-columns:repeat(2,1fr)}article{padding:18px}}
+</style>
+<main>
+  <header><div class="eyebrow">TRUST404 / VERIFIABLE RECORDS</div><h1>그 거절은 다시 확인할 수 있을까?</h1>
+    <p class="muted">요청 당시의 잔액과 규칙으로 기관의 판단을 다시 계산합니다.</p>
+    <p><span class="badge">로컬 테스트 체인</span> <span class="badge">Aomi 연결 전</span></p>
+  </header>
+  <nav id="scenarios" aria-label="시연 사례"></nav>
+  <article>
+    <h2 id="title">시연 준비 중</h2><p id="description" class="muted"></p>
+    <div class="numbers"><div><span>접수 당시 잔액</span><strong>120</strong></div><div><span>지급 요청</span><strong>50</strong></div><div><span>유지해야 할 잔액</span><strong>100</strong></div><div><span>이후 변경된 잔액</span><strong>200</strong></div></div>
+    <p class="muted">단위: 시연용 토큰 · 120 − 50 = 70으로 최소 잔액 100보다 적습니다.</p>
+    <button id="run" disabled>검증 실행</button>
+    <section id="result" aria-live="polite"><p>사례를 선택하고 검증을 실행하세요.</p></section>
+  </article>
+  <article><details><summary>등록 기록과 검증 결과 보기</summary><dl id="records"></dl><pre id="raw">아직 실행하지 않았습니다.</pre></details></article>
+  <footer>자체 로컬 체인에 실제 계약을 배포한 시연입니다. 공개 테스트넷과 Aomi에는 아직 연결되지 않았습니다.<br>변조·유실은 별도의 시연용 사본에 적용하며, 검증은 각 사례에 표시된 블록을 기준으로 실행합니다.</footer>
+</main><script src="/ui.js" defer></script></html>
