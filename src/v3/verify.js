@@ -1,6 +1,6 @@
 import { check, canonical, verifySignature } from './crypto.js';
 import { buildTree, verifyProof } from './merkle.js';
-import { validateTrust, validateRequest, validateDecision, receiptRef } from './policy.js';
+import { validateTrust, validateRequest, validateDecision, receiptRef, evaluatePolicy } from './policy.js';
 
 const operational = new Set(['RPC_UNAVAILABLE', 'BLOCK_UNAVAILABLE', 'FINALITY_UNAVAILABLE', 'STATE_UNAVAILABLE',
   'DATA_UNAVAILABLE', 'REORG', 'BATCH_UNAVAILABLE']);
@@ -20,7 +20,7 @@ async function checkPair(request, decision, ref, rm, dm, snapshot, trust, chain)
   check(BigInt(dm.blockNumber) > BigInt(rm.blockNumber), 'INVALID_EVENT_ORDER');
   return validateDecision(decision, request, ref, snapshot, trust, chain);
 }
-export async function verifyOne(bundle, trust, chain) {
+export async function verifyOne(bundle, trust, chain, aomi = null) {
   validateTrust(trust); await chain.assertCanonical();
   const rm = await inclusion(bundle.request, chain), dm = await inclusion(bundle.decision, chain);
   const request = bundle.request.record;
@@ -28,8 +28,63 @@ export async function verifyOne(bundle, trust, chain) {
   const ref = receiptRef(rm, bundle.request.index);
   const decision = await checkPair(request, bundle.decision.record, ref, rm, dm, bundle.snapshot ?? null, trust, chain);
   await chain.assertCanonical();
-  return { ok: true, requestId: request.requestId, record: 'VALID', policy: 'MATCH', outcome: decision.outcome,
-    reason: decision.reason, timing: timing(rm, dm, chain.context), finality: chain.finality, asOf: chain.context };
+
+  const recordIntegrity = {
+    requestSignature: 'VALID',
+    decisionSignature: 'VALID',
+    requestProof: 'VALID',
+    decisionProof: 'VALID',
+    onchainRoots: 'MATCH'
+  };
+
+  let replay = null;
+  if (trust.policy.policyId === 'credit-ltv-v1') {
+    const dPayload = decision;
+    const blockNumber = dPayload.blockNumber ?? ref.blockNumber;
+    let replayedState;
+    if (aomi && typeof aomi.replayStateAtBlock === 'function') {
+      replayedState = await aomi.replayStateAtBlock({
+        blockNumber,
+        targetContract: trust.policy.creditStateAddress,
+        subject: request.request.payload.subject
+      });
+    } else {
+      replayedState = await chain.creditState(ref, request.request.payload.subject, trust.policy.creditStateAddress);
+      replayedState.blockNumber = String(blockNumber);
+      replayedState.blockHash = ref.blockHash;
+    }
+
+    const stateMatch = replayedState.collateral === bundle.snapshot.collateral && replayedState.debt === bundle.snapshot.debt;
+    check(stateMatch, 'STATE_MISMATCH');
+
+    const policyReplay = evaluatePolicy(bundle.snapshot, request.request.payload, trust.policy);
+    const policyMatch = policyReplay.outcome === dPayload.outcome && policyReplay.reason === dPayload.reason;
+    check(policyMatch, 'POLICY_MISMATCH');
+
+    replay = {
+      blockNumber: String(blockNumber),
+      blockHash: replayedState.blockHash ?? ref.blockHash,
+      state: 'MATCH',
+      policy: 'MATCH',
+      outcome: 'MATCH'
+    };
+  }
+
+  return {
+    ok: true,
+    status: 'VERIFIED',
+    requestId: request.requestId,
+    record: 'VALID',
+    policy: 'MATCH',
+    outcome: decision.outcome,
+    reason: decision.reason,
+    decision: { outcome: decision.outcome, reason: decision.reason },
+    timing: timing(rm, dm, chain.context),
+    finality: chain.finality,
+    asOf: chain.context,
+    recordIntegrity,
+    replay
+  };
 }
 export async function auditAll(archive, trust, chain) {
   validateTrust(trust); await chain.assertCanonical();

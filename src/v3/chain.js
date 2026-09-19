@@ -9,6 +9,12 @@ export const anchorAbi = parseAbi([
   'function anchorBatch(uint256 expectedBatchId, bytes32 root, uint256 count)',
 ]);
 const tokenAbi = parseAbi(['function balanceOf(address) view returns (uint256)']);
+export const creditStateAbi = parseAbi([
+  'function owner() view returns (address)',
+  'function collateralOf(address) view returns (uint256)',
+  'function debtOf(address) view returns (uint256)',
+  'function setAccountState(address user, uint256 collateral, uint256 debt)',
+]);
 export const quantity = value => '0x' + BigInt(value).toString(16);
 
 export function jsonRpc(url, { fetchImpl = fetch, timeoutMs = 10000 } = {}) {
@@ -102,6 +108,20 @@ class ChainView {
       task.catch(() => { if (reads.get(key) === task) reads.delete(key); });
     }
     return reads.get(key);
+  }
+  async creditState(ref, subject, contractAddress) {
+    await this.block(ref);
+    const target = contractAddress ?? this.reader.trust.policy.creditStateAddress;
+    const dataCol = encodeFunctionData({ abi: creditStateAbi, functionName: 'collateralOf', args: [subject] });
+    const dataDebt = encodeFunctionData({ abi: creditStateAbi, functionName: 'debtOf', args: [subject] });
+    const [rawCol, rawDebt] = await Promise.all([
+      this.reader.rpc('eth_call', [{ to: target, data: dataCol }, { blockHash: ref.blockHash, requireCanonical: true }]),
+      this.reader.rpc('eth_call', [{ to: target, data: dataDebt }, { blockHash: ref.blockHash, requireCanonical: true }])
+    ]);
+    check(/^0x[0-9a-fA-F]{64}$/.test(rawCol) && /^0x[0-9a-fA-F]{64}$/.test(rawDebt), 'INVALID_STATE');
+    const collateral = decodeFunctionResult({ abi: creditStateAbi, functionName: 'collateralOf', data: rawCol }).toString();
+    const debt = decodeFunctionResult({ abi: creditStateAbi, functionName: 'debtOf', data: rawDebt }).toString();
+    return { collateral, debt };
   }
 }
 export function anchorCall(batch, trust) {

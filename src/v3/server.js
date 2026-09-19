@@ -1,8 +1,9 @@
 import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { canonical, parseWire, check } from './crypto.js';
+import { verifyOne } from './verify.js';
 
-export function createEvidenceServer({ store, reader, writeToken, signer }) {
+export function createEvidenceServer({ store, reader, writeToken, signer, aomi = null }) {
   check(typeof writeToken === 'string' && writeToken.length >= 32, 'WRITE_TOKEN_REQUIRED');
   const credential = Buffer.from(`Bearer ${writeToken}`);
   // All mutations share one queue: batch assignment and signing cannot race.
@@ -15,6 +16,11 @@ export function createEvidenceServer({ store, reader, writeToken, signer }) {
       if (req.method === 'GET') {
         let match;
         if ((match = path.match(/^\/v3\/requests\/(0x[0-9a-f]{64})\/evidence$/))) value = store.bundle(match[1]);
+        else if ((match = path.match(/^\/v3\/requests\/(0x[0-9a-f]{64})\/verification$/))) {
+          const bundle = store.bundle(match[1]);
+          const chainView = await reader.at('latest');
+          value = await verifyOne(bundle, store.trust, chainView, aomi);
+        }
         else if ((match = path.match(/^\/v3\/batches\/([1-9][0-9]*)$/))) value = store.archive.batch(match[1]);
         else if ((match = path.match(/^\/v3\/blobs\/(0x[0-9a-f]{64})$/))) value = store.archive.blob(match[1]);
         else { res.writeHead(404).end(); return; }
