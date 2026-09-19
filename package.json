@@ -8,7 +8,8 @@
     "test:contracts": "forge test",
     "test:integration": "forge build && node --test test/integration/*.test.js",
     "evidence": "node src/v3/cli.js",
-    "demo:local": "forge build && node src/demo/local.js"
+    "demo:local": "forge build && node src/demo/local.js",
+    "check:testnet": "node scripts/check-base-sepolia.js"
   },
   "engines": {
     "node": ">=22.22.2"

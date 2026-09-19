@@ -5,16 +5,16 @@ import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { setupLocalBaseline } from '../../scripts/deploy-local.js';
-import { AomiRuntimeAdapter } from '../../src/v3/aomi.js';
+import { RpcRuntimeAdapter } from '../../src/v3/rpc-runtime.js';
 import { Archive, EvidenceStore } from '../../src/v3/store.js';
 import { ChainReader, anchorCall } from '../../src/v3/chain.js';
 import { hash, canonical, sign } from '../../src/v3/crypto.js';
 import { scope, requestRecord, receiptRef } from '../../src/v3/policy.js';
 import { verifyOne } from '../../src/v3/verify.js';
 
-test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi', async () => {
+test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with direct RPC', async () => {
   const env = await setupLocalBaseline();
-  const aomi = new AomiRuntimeAdapter({ rpcUrl: env.rpcUrl });
+  const runtime = new RpcRuntimeAdapter({ rpcUrl: env.rpcUrl });
   const deployerKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 
   const workDir = mkdtempSync(join(tmpdir(), 'trust404-demo-'));
@@ -69,7 +69,7 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     const subResult = store.submit(request);
     assert.equal(subResult.duplicate, false);
 
-    // 2. Prepare Batch 1 & Anchor via Aomi Harness
+    // 2. Prepare Batch 1 & Anchor via direct RPC Harness
     const mockChainViewInitial = {
       assertCanonical: async () => {},
       count: async () => '0',
@@ -78,15 +78,15 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     const batch1Prep = await store.prepare(mockChainViewInitial);
     assert.equal(batch1Prep.batchId, '1');
 
-    // Broadcast batch 1 on chain via Aomi
-    const broadcast1 = await aomi.stageAndBroadcast({
+    // Broadcast batch 1 on chain via direct RPC
+    const broadcast1 = await runtime.stageAndBroadcast({
       to: batch1Prep.transaction.to,
       data: batch1Prep.transaction.data,
       privateKey: deployerKey
     });
     assert.equal(broadcast1.status, 'success');
 
-    // 3. Decide: Reader accesses Block N state via Aomi -> Evaluates -> Creates Decision
+    // 3. Decide: Reader accesses Block N state via direct RPC -> Evaluates -> Creates Decision
     // Mock chain view matching on-chain RecordAnchor
     const chainReader = {
       assertCanonical: async () => {},
@@ -121,8 +121,8 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
         };
       },
       creditState: async (ref, subject, contract) => {
-        // Reads via Aomi at specific block N
-        return aomi.replayStateAtBlock({
+        // Reads via direct RPC at specific block N
+        return runtime.replayStateAtBlock({
           blockNumber: env.blockNumber,
           targetContract: contract,
           subject
@@ -146,7 +146,7 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     assert.equal(decisionRecord.decision.payload.outcome, 'REJECTED');
     assert.equal(decisionRecord.decision.payload.reason, 'LTV_EXCEEDED');
 
-    // 4. Prepare Batch 2 (Decision) & Anchor via Aomi Harness
+    // 4. Prepare Batch 2 (Decision) & Anchor via direct RPC Harness
     const mockChainViewBatch2 = {
       ...chainReader,
       count: async () => '1'
@@ -154,7 +154,7 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     const batch2Prep = await store.prepare(mockChainViewBatch2);
     assert.equal(batch2Prep.batchId, '2');
 
-    const broadcast2 = await aomi.stageAndBroadcast({
+    const broadcast2 = await runtime.stageAndBroadcast({
       to: batch2Prep.transaction.to,
       data: batch2Prep.transaction.data,
       privateKey: deployerKey
@@ -171,7 +171,7 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     // Update Alice's collateral to 200 on the live chain!
     // In current state: borrow 80 / 200 = 40% <= 70% (would be approved).
     await env.setCreditState(env.aliceAddress, 200n, 0n);
-    const liveLatest = await aomi.client.readContract({
+    const liveLatest = await runtime.client.readContract({
       address: env.creditStateAddress,
       abi: [{ name: 'collateralOf', type: 'function', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] }],
       functionName: 'collateralOf',
@@ -179,8 +179,8 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     });
     assert.equal(liveLatest.toString(), '200');
 
-    // 7. Verify Two Layers via Aomi Replay!
-    const vResult = await verifyOne(bundle, trust, chainReader, aomi);
+    // 7. Verify Two Layers via direct RPC Replay!
+    const vResult = await verifyOne(bundle, trust, chainReader, runtime);
 
     assert.equal(vResult.ok, true);
     assert.equal(vResult.status, 'VERIFIED');
@@ -199,7 +199,7 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     tamperedBundle.decision.record.decision.payload.outcome = 'APPROVED';
     await assert.rejects(
       async () => {
-        await verifyOne(tamperedBundle, trust, chainReader, aomi);
+        await verifyOne(tamperedBundle, trust, chainReader, runtime);
       },
       /INVALID_INCLUSION|INVALID_SIGNATURE/
     );
@@ -210,7 +210,7 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     alteredPolicyTrust.policyHash = hash('policy-v3', alteredPolicyTrust.policy);
     await assert.rejects(
       async () => {
-        await verifyOne(bundle, alteredPolicyTrust, chainReader, aomi);
+        await verifyOne(bundle, alteredPolicyTrust, chainReader, runtime);
       },
       /POLICY_MISMATCH|REQUEST_CONTEXT_MISMATCH|DECISION_CONTEXT_MISMATCH/
     );
@@ -220,7 +220,7 @@ test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with Aomi
     tamperedSnapshotBundle.snapshot.collateral = '150';
     await assert.rejects(
       async () => {
-        await verifyOne(tamperedSnapshotBundle, trust, chainReader, aomi);
+        await verifyOne(tamperedSnapshotBundle, trust, chainReader, runtime);
       },
       /STATE_HASH_MISMATCH/
     );

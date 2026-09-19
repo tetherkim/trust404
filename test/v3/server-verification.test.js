@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { setupLocalBaseline } from '../../scripts/deploy-local.js';
-import { AomiRuntimeAdapter } from '../../src/v3/aomi.js';
+import { RpcRuntimeAdapter } from '../../src/v3/rpc-runtime.js';
 import { Archive, EvidenceStore } from '../../src/v3/store.js';
 import { createEvidenceServer } from '../../src/v3/server.js';
 import { hash, canonical } from '../../src/v3/crypto.js';
@@ -27,7 +27,7 @@ async function closeServer(server) {
 
 test('TASK-10: GET /v3/requests/:id/verification endpoint returns two-layer verification JSON', async () => {
   const env = await setupLocalBaseline();
-  const aomi = new AomiRuntimeAdapter({ rpcUrl: env.rpcUrl });
+  const runtime = new RpcRuntimeAdapter({ rpcUrl: env.rpcUrl });
   const deployerKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 
   const workDir = mkdtempSync(join(tmpdir(), 'trust404-api-'));
@@ -113,7 +113,7 @@ test('TASK-10: GET /v3/requests/:id/verification endpoint returns two-layer veri
       };
     },
     creditState: async (ref, subject, contract) => {
-      return aomi.replayStateAtBlock({
+      return runtime.replayStateAtBlock({
         blockNumber: env.blockNumber,
         targetContract: contract,
         subject
@@ -130,14 +130,14 @@ test('TASK-10: GET /v3/requests/:id/verification endpoint returns two-layer veri
 
   // Prepare & anchor batch 1
   const b1 = await store.prepare({ assertCanonical: async () => {}, count: async () => '0', batch: async () => null });
-  await aomi.stageAndBroadcast({ to: b1.transaction.to, data: b1.transaction.data, privateKey: deployerKey });
+  await runtime.stageAndBroadcast({ to: b1.transaction.to, data: b1.transaction.data, privateKey: deployerKey });
 
   // Decide
   await store.decide(request.requestId, chainReader, 'trust-lending', institution.privateKey);
 
   // Prepare & anchor batch 2
   const b2 = await store.prepare({ ...chainReader, count: async () => '1' });
-  await aomi.stageAndBroadcast({ to: b2.transaction.to, data: b2.transaction.data, privateKey: deployerKey });
+  await runtime.stageAndBroadcast({ to: b2.transaction.to, data: b2.transaction.data, privateKey: deployerKey });
 
   // Mutate on chain
   await env.setCreditState(env.aliceAddress, 200n, 0n);
@@ -148,7 +148,7 @@ test('TASK-10: GET /v3/requests/:id/verification endpoint returns two-layer veri
     reader: chainReader,
     writeToken,
     signer: { keyId: 'trust-lending', privateKey: institution.privateKey },
-    aomi
+    runtime
   });
 
   const port = await listen(server);

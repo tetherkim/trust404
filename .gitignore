@@ -9,3 +9,4 @@ cache/
 *.sqlite*
 .local-demo/
 .env
+local-baseline-context.json

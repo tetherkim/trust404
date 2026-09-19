@@ -1,7 +1,7 @@
 import { createServer as netServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPublicClient, createWalletClient, http, encodeFunctionData, decodeFunctionResult } from 'viem';
@@ -146,8 +146,6 @@ export async function setupLocalBaseline({ port, silent = true } = {}) {
     collateral: '100',
     debt: '0'
   };
-
-  writeFileSync(join(root, 'local-baseline-context.json'), JSON.stringify(contextData, null, 2));
 
   const teardown = async () => {
     if (child.pid && child.exitCode === null && child.signalCode === null) {

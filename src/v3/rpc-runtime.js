@@ -1,21 +1,19 @@
 import { createPublicClient, createWalletClient, http, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { foundry } from 'viem/chains';
-import { check, integer, hashShape, addressShape } from './crypto.js';
-import { creditStateAbi, anchorAbi } from './chain.js';
+import { check, hashShape, addressShape } from './crypto.js';
+import { creditStateAbi, quantity } from './chain.js';
 
 /**
- * AomiRuntimeAdapter
+ * Direct RPC prototype. Does not call Aomi, create a fork, enforce Aomi
+ * permissions, or sponsor gas. Signing is restricted to the local test chain.
  *
- * Provides the two core capabilities required for Track 03:
- * 1. Historical Replay Environment: Reproduces exact chain state at Block N.
- * 2. Execution Harness: Simulates, signs, and broadcasts RecordAnchor batch transactions.
+ * Reads two historical contract values and preflights local anchor transactions.
  */
-export class AomiRuntimeAdapter {
-  constructor({ rpcUrl, chainId = 31337, aomiCliPath = null } = {}) {
+export class RpcRuntimeAdapter {
+  constructor({ rpcUrl, chainId = 31337 } = {}) {
     this.rpcUrl = rpcUrl;
     this.chainId = chainId;
-    this.aomiCliPath = aomiCliPath;
     this.client = createPublicClient({ transport: http(rpcUrl) });
   }
 
@@ -27,32 +25,26 @@ export class AomiRuntimeAdapter {
    * @param {string} params.subject User address
    * @returns {Promise<{ collateral: string, debt: string, blockNumber: string, blockHash: string }>}
    */
-  async replayStateAtBlock({ blockNumber, targetContract, subject }) {
+  async replayStateAtBlock({ blockNumber, blockHash, targetContract, subject }) {
     check(blockNumber !== undefined && blockNumber !== null, 'BLOCK_NUMBER_REQUIRED');
     check(blockNumber !== 'latest', 'HISTORICAL_BLOCK_REQUIRED_NOT_LATEST');
     check(addressShape(targetContract), 'INVALID_TARGET_CONTRACT');
     check(addressShape(subject), 'INVALID_SUBJECT');
 
     const bn = typeof blockNumber === 'bigint' ? blockNumber : BigInt(blockNumber);
+    check(await this.client.getChainId() === this.chainId, 'CHAIN_MISMATCH');
     const block = await this.client.getBlock({ blockNumber: bn });
     check(block && hashShape(block.hash), 'BLOCK_UNAVAILABLE');
-
-    const [collateralRaw, debtRaw] = await Promise.all([
-      this.client.readContract({
-        address: targetContract,
-        abi: creditStateAbi,
-        functionName: 'collateralOf',
-        args: [subject],
-        blockNumber: bn
-      }),
-      this.client.readContract({
-        address: targetContract,
-        abi: creditStateAbi,
-        functionName: 'debtOf',
-        args: [subject],
-        blockNumber: bn
-      })
-    ]);
+    if (blockHash !== undefined) check(block.hash === blockHash, 'REORG');
+    const pinned = { blockHash: block.hash, requireCanonical: true };
+    const read = async functionName => {
+      const data = encodeFunctionData({ abi: creditStateAbi, functionName, args: [subject] });
+      const raw = await this.client.request({ method: 'eth_call', params: [{ to: targetContract, data }, pinned] });
+      return decodeFunctionResult({ abi: creditStateAbi, functionName, data: raw });
+    };
+    const [collateralRaw, debtRaw] = await Promise.all([read('collateralOf'), read('debtOf')]);
+    const after = await this.client.request({ method: 'eth_getBlockByNumber', params: [quantity(bn), false] });
+    check(after?.hash === block.hash, 'REORG');
 
     return {
       collateral: collateralRaw.toString(),
@@ -71,13 +63,17 @@ export class AomiRuntimeAdapter {
    * @returns {Promise<{ transactionHash: string, blockNumber: string, status: string }>}
    */
   async stageAndBroadcast({ to, data, privateKey }) {
+    const url = new URL(this.rpcUrl);
+    check(['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) && this.chainId === 31337,
+      'LOCAL_SIGNING_ONLY');
+    check(await this.client.getChainId() === 31337, 'CHAIN_MISMATCH');
     check(addressShape(to), 'INVALID_ANCHOR_ADDRESS');
     check(typeof data === 'string' && data.startsWith('0x'), 'INVALID_CALLDATA');
 
     const account = privateKeyToAccount(privateKey);
     const wallet = createWalletClient({ account, chain: foundry, transport: http(this.rpcUrl) });
 
-    // Step 1: Simulate tx execution on fork/chain
+    // Direct eth_call preflight, not an Aomi managed-fork simulation.
     await this.client.call({
       account: account.address,
       to,

@@ -20,7 +20,7 @@ async function checkPair(request, decision, ref, rm, dm, snapshot, trust, chain)
   check(BigInt(dm.blockNumber) > BigInt(rm.blockNumber), 'INVALID_EVENT_ORDER');
   return validateDecision(decision, request, ref, snapshot, trust, chain);
 }
-export async function verifyOne(bundle, trust, chain, aomi = null) {
+export async function verifyOne(bundle, trust, chain, runtime = null) {
   validateTrust(trust); await chain.assertCanonical();
   const rm = await inclusion(bundle.request, chain), dm = await inclusion(bundle.decision, chain);
   const request = bundle.request.record;
@@ -42,9 +42,10 @@ export async function verifyOne(bundle, trust, chain, aomi = null) {
     const dPayload = decision;
     const blockNumber = dPayload.blockNumber ?? ref.blockNumber;
     let replayedState;
-    if (aomi && typeof aomi.replayStateAtBlock === 'function') {
-      replayedState = await aomi.replayStateAtBlock({
+    if (runtime && typeof runtime.replayStateAtBlock === 'function') {
+      replayedState = await runtime.replayStateAtBlock({
         blockNumber,
+        blockHash: ref.blockHash,
         targetContract: trust.policy.creditStateAddress,
         subject: request.request.payload.subject
       });
@@ -54,6 +55,7 @@ export async function verifyOne(bundle, trust, chain, aomi = null) {
       replayedState.blockHash = ref.blockHash;
     }
 
+    check(replayedState.blockHash === ref.blockHash && String(replayedState.blockNumber) === String(ref.blockNumber), 'REORG');
     const stateMatch = replayedState.collateral === bundle.snapshot.collateral && replayedState.debt === bundle.snapshot.debt;
     check(stateMatch, 'STATE_MISMATCH');
 
