@@ -63,6 +63,7 @@ contract EvidenceLog {
     }
 
     function registerRequest(bytes32 requestHash) external returns (uint256 requestIndex, uint256 checkpointId) {
+        if (msg.sender != institution) revert Unauthorized();
         if (_requestHashes[msg.sender][requestHash]) revert DuplicateRequest();
         _requestHashes[msg.sender][requestHash] = true;
         _requests[size] = RequestState.Pending;

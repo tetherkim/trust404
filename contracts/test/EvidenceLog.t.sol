@@ -19,13 +19,13 @@ contract EvidenceLogTest is Test {
 
     function test_RequestAndDecision() public {
         _assertCheckpoint(0, 0, Hashes.commutativeKeccak256(bytes32(0), bytes32(0)), 1000);
-        bytes32 requestLeaf = _leaf(0, 0, CUSTOMER, 0, REQUEST);
+        bytes32 requestLeaf = _leaf(0, 0, INSTITUTION, 0, REQUEST);
         bytes32 requestRoot = Hashes.commutativeKeccak256(requestLeaf, bytes32(0));
         vm.expectEmit(address(evidenceLog));
-        emit EvidenceLog.EntryRecorded(0, 0, CUSTOMER, 0, REQUEST, 1000, 1);
+        emit EvidenceLog.EntryRecorded(0, 0, INSTITUTION, 0, REQUEST, 1000, 1);
         vm.expectEmit(address(evidenceLog));
         emit EvidenceLog.CheckpointPublished(1, 1, requestRoot, 1000);
-        vm.prank(CUSTOMER);
+        vm.prank(INSTITUTION);
         (uint256 index, uint256 checkpointId) = evidenceLog.registerRequest(REQUEST);
         assertEq(index, 0);
         assertEq(checkpointId, 1);
@@ -47,18 +47,21 @@ contract EvidenceLogTest is Test {
         _assertCheckpoint(2, 2, root, 1010);
     }
 
-    function test_RequestDeduplicationIsPerCustomer() public {
-        vm.startPrank(CUSTOMER);
+    function test_RequestRegistrationRequiresInstitution() public {
+        vm.prank(CUSTOMER);
+        vm.expectRevert(EvidenceLog.Unauthorized.selector);
+        evidenceLog.registerRequest(REQUEST);
+
+        vm.startPrank(INSTITUTION);
         evidenceLog.registerRequest(REQUEST);
         vm.expectRevert(EvidenceLog.DuplicateRequest.selector);
         evidenceLog.registerRequest(REQUEST);
         vm.stopPrank();
-        (uint256 index,) = evidenceLog.registerRequest(REQUEST);
-        assertEq(index, 1);
+        assertEq(evidenceLog.size(), 1);
     }
 
     function test_DecisionValidation() public {
-        vm.prank(CUSTOMER);
+        vm.prank(INSTITUTION);
         evidenceLog.registerRequest(REQUEST);
         vm.expectRevert(EvidenceLog.Unauthorized.selector);
         evidenceLog.registerDecision(0, DECISION);
@@ -78,7 +81,7 @@ contract EvidenceLogTest is Test {
     }
 
     function test_ZeroHashesDoNotConsumeRegistration() public {
-        vm.startPrank(CUSTOMER);
+        vm.startPrank(INSTITUTION);
         vm.expectRevert(EvidenceLog.ZeroHash.selector);
         evidenceLog.registerRequest(bytes32(0));
         evidenceLog.registerRequest(REQUEST);
@@ -96,6 +99,7 @@ contract EvidenceLogTest is Test {
         vm.prank(CUSTOMER);
         assertEq(evidenceLog.createCheckpoint(), 1);
         assertEq(abi.encode(evidenceLog.getCheckpoint(0)), abi.encode(evidenceLog.getCheckpoint(1)));
+        vm.prank(INSTITUTION);
         evidenceLog.registerRequest(REQUEST);
         bytes32 root = evidenceLog.root();
         vm.warp(1060);
@@ -109,20 +113,37 @@ contract EvidenceLogTest is Test {
     }
 
     function test_FullTreeRevertsWithoutChangingState() public {
+        vm.startPrank(INSTITUTION);
         evidenceLog.registerRequest(REQUEST);
         evidenceLog.registerRequest(keccak256("second request"));
         bytes32 root = evidenceLog.root();
         vm.recordLogs();
         vm.expectRevert(stdError.memOverflowError);
         evidenceLog.registerRequest(keccak256("third request"));
-        vm.prank(INSTITUTION);
         vm.expectRevert(stdError.memOverflowError);
         evidenceLog.registerDecision(0, DECISION);
+        vm.stopPrank();
         assertEq(vm.getRecordedLogs().length, 0);
         assertEq(evidenceLog.size(), 2);
         assertEq(evidenceLog.root(), root);
         assertEq(evidenceLog.checkpointCount(), 3);
         assertEq(evidenceLog.createCheckpoint(), 3);
+    }
+
+    function test_DepthSixCapacityAndOverflow() public {
+        EvidenceLog fullLog = new EvidenceLog(INSTITUTION, 6);
+        vm.startPrank(INSTITUTION);
+        for (uint256 i = 0; i < 64; i++) {
+            fullLog.registerRequest(keccak256(abi.encode(i)));
+        }
+        bytes32 fullRoot = fullLog.root();
+        vm.expectRevert(stdError.memOverflowError);
+        fullLog.registerRequest(keccak256("overflow"));
+        vm.stopPrank();
+
+        assertEq(fullLog.size(), 64);
+        assertEq(fullLog.root(), fullRoot);
+        assertEq(fullLog.checkpointCount(), 65);
     }
 
     function _leaf(uint256 index, uint8 kind, address actor, uint256 requestIndex, bytes32 payloadHash)
