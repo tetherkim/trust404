@@ -55,7 +55,12 @@ export class Operator {
       receipt=await this.client.waitForTransactionReceipt({hash:journal.hash,timeout:60000});
     }
     check(receipt.status==='success','TRANSACTION_REVERTED');
-    const block=await this.client.getBlock({blockNumber:receipt.blockNumber});check(block.hash===receipt.blockHash,'REORG');
+    let block;
+    for(let attempt=0;;attempt++){
+      try{block=await this.client.getBlock({blockNumber:receipt.blockNumber});break;}
+      catch(error){if(error.name!=='BlockNotFoundError'||attempt>=4)throw error;await new Promise(r=>setTimeout(r,2000));}
+    }
+    check(block.hash===receipt.blockHash,'REORG');
     return receipt;
   }
   async deploy(){
@@ -76,6 +81,20 @@ export class Operator {
     if(this.has(name)){record=this.load(name);check(record.request.payload.amountAtomic===amount,'IDEMPOTENCY_CONFLICT');}
     else{record=requestRecord({...scope(p),requesterId:'requester',institutionId:p.institutionId,token:p.token,treasury:p.treasury,recipient:p.treasury,amountAtomic:amount,createdAtMs:String(Date.now()),policyHash:this.trust.policyHash},'requester',this.secrets.requester.private);this.save(name,record);}
     return this.store.submit(record);
+  }
+  async submit(amount,id){
+    check(/^[1-9][0-9]*$/.test(amount??''),'INVALID_AMOUNT');
+    const request=this.request(amount,id);
+    const audit=await this.cycle();
+    const folder=join(this.dir,'exports',id);mkdirSync(folder,{recursive:true,mode:0o700});
+    // Export public evidence only. Never copy keys, SQLite or signed transaction journals.
+    for(const [name,value] of Object.entries({
+      'audit.json':this.load('audit.json'),'trust.json':this.trust,'audit-result.json':audit,
+      'profiles.json':[{trustFile:'trust.json',rpcUrl:this.config.rpcUrl,asOf:'auto',label:this.trust.policy.logId}],
+    })){
+      const file=join(folder,name);writeFileSync(file+'.tmp',JSON.stringify(value,null,2)+'\n',{mode:0o600,flush:true});renameSync(file+'.tmp',file);
+    }
+    return {request,status:'RECORDED',auditOk:audit.ok,finality:audit.finality,exportDirectory:folder,auditFile:join(folder,'audit.json'),profilesFile:join(folder,'profiles.json')};
   }
   async register(){
     const chain=await this.reader.at('latest');const count=BigInt(await chain.count());
@@ -121,6 +140,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   else{
    op.open();
    if(command==='request')console.log(JSON.stringify(op.request(process.argv[3]??'50000000',process.argv[4]??randomBytes(8).toString('hex'))));
+   else if(command==='submit')console.log(JSON.stringify(await op.submit(process.argv[3],process.argv[4])));
    else if(command==='tick')console.log(JSON.stringify(await op.cycle()));
    else if(command==='run'){
     let stop=false;process.once('SIGINT',()=>{stop=true;});process.once('SIGTERM',()=>{stop=true;});

@@ -9,6 +9,7 @@ import {once} from 'node:events';
 import {foundry} from 'viem/chains';
 import {createWalletClient,http} from 'viem';
 import {mnemonicToAccount} from 'viem/accounts';
+import {startAuditServer} from '../../src/demo/audit-server.js';
 import {Operator} from '../../src/operator/run.js';
 
 test('automatic operator handles three requests, replay and process restart without duplicate batches', {timeout:60000}, async t=>{
@@ -24,13 +25,31 @@ test('automatic operator handles three requests, replay and process restart with
  const token=JSON.parse(readFileSync('out/RecordAnchor.t.sol/TestToken.json'));
  const receipt=await op.client.waitForTransactionReceipt({hash:await wallet.deployContract({abi:token.abi,bytecode:token.bytecode.object})});config.token=receipt.contractAddress.toLowerCase();
  await op.deploy();op.open();
- for(let i=1;i<=3;i++)op.request('50000000',`request${i}`);
- const result=await op.cycle();assert.equal(result.ok,true);assert.equal(result.requests.length,3);assert.equal(result.batchCount,'2');
+ for(let i=1;i<=2;i++)op.request('50000000',`request${i}`);
+ await op.submit('50000000','request3');
+ const result=op.load('audit-result.json');assert.equal(result.ok,true);assert.equal(result.requests.length,3);assert.equal(result.batchCount,'2');
  assert(result.requests.every(r=>r.decisions[0].outcome==='REJECTED'));
  op.close();op=new Operator(dir,config);op.init();op.open();
  assert.equal(op.request('50000000','request1').duplicate,true);
  assert.throws(()=>op.request('60000000','request1'),/IDEMPOTENCY_CONFLICT/);
  const repeated=await op.cycle();assert.equal(repeated.batchCount,'2');assert.equal(repeated.ok,true);
+ const completed=await op.submit('50000000','request1');
+ assert.equal(completed.status,'RECORDED');assert.equal(completed.auditOk,true);
+ const server=await startAuditServer(completed.profilesFile,0);
+ t.after(()=>server.close());
+ const base=`http://127.0.0.1:${server.address().port}`;
+ const upload=JSON.parse(readFileSync(completed.auditFile));
+ // The auditor only receives exported public files, never the operator DB or keys.
+ const post=async data=>{const response=await fetch(base+'/api/audit-file',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});assert.equal(response.status,200);return response.json();};
+ assert.equal((await post(upload)).ok,true);
+ assert.deepEqual(await (await fetch(base+'/api/samples')).json(),[]);
+ assert.equal((await fetch(base+'/api/profiles')).status,200);
+ const missing=structuredClone(upload);delete missing.batches['2'];
+ const missingResult=await post(missing);assert.equal(missingResult.ok,false);assert(missingResult.issues.some(i=>i.code==='DATA_UNAVAILABLE'));
+ const tampered=structuredClone(upload);tampered.batches['2'][0].decision.payload.reason='FORGED';
+ assert.equal((await post(tampered)).ok,false);
+ const unknown=structuredClone(upload);unknown.profileId='attacker-profile';
+ assert.equal((await fetch(base+'/api/audit-file',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(unknown)})).status,400);
  const journal=op.load('tx-batch-2.json');const count=await op.client.getTransactionCount({address:identity.address});
  await op.transact('batch-2',{to:journal.to,data:journal.data});assert.equal(await op.client.getTransactionCount({address:identity.address}),count);
 });

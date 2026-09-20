@@ -182,6 +182,7 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
         }
         let result;
         if (path === '/api/deployment') result = deployment ?? { status: 'NOT_CONFIGURED' };
+        else if (path === '/api/samples') result = [...records.values()].map(r => ({id:r.info.id,name:r.info.title}));
         else if (path === '/api/profiles') result = [...profiles].map(([id, p]) => ({ id, label: p.label, institutionId: p.trust.policy.institutionId, policyId: p.trust.policy.policyId, chainId: p.trust.policy.chainId, anchorAddress: p.trust.policy.anchorAddress, cutoff: p.asOf ?? 'finalized' }));
         else if (path.startsWith('/api/sample/')) {
           const record = records.get(path.slice('/api/sample/'.length));

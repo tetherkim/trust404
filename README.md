@@ -18,6 +18,8 @@
 - 기준 블록 47052458, 결과 `ok: true`, `PROVISIONAL`.
 - RPC의 일시적 BlockNotFound 이후 같은 journal로 재실행해 완료했습니다. 첫 시도부터 무오류였다는 의미는 아닙니다.
 
+2026-09-20 추가 E2E: `submit`으로 새 요청을 처리한 뒤 export 파일을 별도 감사 HTTP 서버에 가져와 요청 4건·배치 4개, `ok: true`, `PROVISIONAL`을 확인했습니다. RPC의 일시적 블록 조회 실패 후 같은 중복 방지 키로 재개했습니다.
+
 ## 설치
 
 저장소 루트에서 Node.js 22.22.2 이상, npm, Foundry의 forge/anvil이 필요합니다. 패키지 설치와 테스트넷 실행에는 네트워크 연결이 필요합니다.
@@ -45,42 +47,50 @@ npm run operator -- deploy
 
 `deploy`는 전용 지갑을 publisher로 새 RecordAnchor를 한 번 배포합니다. 이미 배포된 경우 주소를 반환합니다. 거래당 최대 예상 비용은 0.001 test ETH, 하루 예약 비용 한도는 0.01 test ETH입니다. 가스 부족이나 한도 초과 시 중단합니다. 계정은 이 worker만 사용하세요.
 
-### 2. 요청 세 건 생성
+### 2. 한 번에 요청 처리와 감사 파일 저장
 
-금액은 USDC의 최소 단위(1 USDC = 1000000)입니다. 마지막 인자는 필수 중복 방지 키입니다. 같은 키·금액으로 재실행해도 요청은 하나이며, 같은 키에 다른 금액은 거부합니다.
+지갑 충전과 최초 계약 배포를 마친 뒤 실행합니다. 1 USDC = 1000000 최소 단위이며 마지막 값은 중복 방지 키입니다.
 
 ```sh
-npm run operator -- request 50000000 demo-1
+npm run operator -- submit 50000000 demo-1
+```
+
+이 명령은 요청 저장 → 요청 등록 거래 확인 → 등록 블록 상태로 판단 → 판단 등록 거래 확인 → 독립 감사 → 공유용 파일 저장까지 수행합니다. 종료 코드 0과 `status: RECORDED`가 처리 완료 기준입니다. `auditOk`는 감사 결과이며, 이상이 발견돼도 증거 파일은 저장합니다. `PROVISIONAL`은 등록 거래는 확인했지만 체인의 최종 확정은 기다리는 상태입니다. 현재는 정책 판단과 증거 등록만 수행하며, USDC를 실제 송금하지 않습니다.
+
+실패하면 같은 명령·같은 키로 재실행합니다. 저장된 거래 hash를 재확인하고 완료된 요청을 중복 생성하지 않습니다. 다른 금액에 같은 키를 쓰면 거부합니다. `run` worker가 실행 중이라면 먼저 정상 종료한 뒤 `submit`을 사용하세요.
+
+성공 시 출력된 `exportDirectory`에는 다음 **공개 파일만** 들어갑니다.
+
+- `audit.json`: 요청·판단·상태 증거. 감사 화면에 가져올 파일.
+- `trust.json`: 기관·요청자 공개키, 정책, 기록 계약. 감사자가 별도 경로로 진위를 확인할 기준.
+- `profiles.json`: 감사 서버 설정. 다른 컴퓨터로 폴더를 옮겨도 상대 경로로 읽습니다.
+- `audit-result.json`: 생성 당시 감사 결과. 나중의 재검증을 대신하지 않습니다.
+
+개인키·DB·서명 거래 journal은 export에 포함되지 않습니다. `.local-demo/operator` 전체를 공유하지 마세요.
+
+### 3. 파일을 가져와 독립 감사
+
+감사자는 `npm ci` 이후 전달받은 **export 폴더**의 신뢰 기준을 별도 경로로 확인하고 실행합니다. 지갑, Foundry, 기관 DB 없이 공개 RPC로 검증합니다.
+
+```sh
+npm run audit:serve -- .local-demo/operator/exports/demo-1/profiles.json
+```
+
+다른 컴퓨터에서는 전달받은 폴더의 `profiles.json` 경로를 사용합니다. http://127.0.0.1:4040 에서 같은 폴더의 `audit.json`을 가져와 **파일 검증**을 누릅니다. 포트가 사용 중이면 명령 끝에 `4042`처럼 다른 포트를 지정합니다. 업로드 파일은 신뢰 키·계약·RPC를 지정할 수 없습니다.
+
+감사는 최신 등록 범위 전체를 확인합니다. export 이후 새 기록이 추가됐다면 오래된 파일은 자료 누락으로 표시될 수 있으므로 최신 export를 전달해야 합니다. `asOf: auto`는 모든 배치가 최종 확정 블록에 포함됐으면 `FINALIZED`, 아직이면 `PROVISIONAL`을 표시합니다. 깊은 reorg 자동 복구는 미구현입니다.
+
+여러 요청을 모아 처리하려면 기존 큐 명령을 사용합니다.
+
+```sh
 npm run operator -- request 50000000 demo-2
 npm run operator -- request 50000000 demo-3
 npm run operator -- tick
-```
-
-`tick`은 한 차례 처리하고 감사 결과를 출력합니다. 테스트 USDC 잔액이 없는 운영 지갑에서는 최소 잔액 정책에 따라 거절됩니다. 실제 USDC 송금은 수행하지 않습니다.
-
-상시 처리하려면 별도 터미널에서 실행합니다. 실행 중 다른 터미널에서 `request`로 새 요청을 넣을 수 있습니다.
-
-```sh
+# 또는 상시 처리 (Ctrl+C로 정상 종료)
 npm run operator -- run
 ```
 
-Ctrl+C로 정상 종료합니다. worker는 단일 실행 잠금을 사용합니다. 강제 종료 후 잠금이 남으면 `operator.lock`에 기록된 PID가 실행 중인지 확인한 뒤, 해당 프로세스가 없을 때만 잠금을 지우세요. journal은 삭제하지 마세요. RPC timeout에서는 같은 저장된 서명 거래와 hash를 재확인하며 임의의 새 nonce로 대체하지 않습니다. 장기 pending/revert/수수료 급등은 운영자 조치가 필요합니다.
-
-### 3. 감사 UI에 연결
-
-`.env`에 다음 설정을 넣고 감사 서버를 실행합니다.
-
-```text
-AUDIT_PROFILES_FILE=.local-demo/operator/profiles.json
-```
-
-```sh
-npm run demo:local
-```
-
-http://127.0.0.1:4040 에서 `.local-demo/operator/audit.json`을 선택하고 **파일 검증**을 누릅니다. 신뢰 기준의 키/계약 주소는 업로드 파일이 아니라 서버 설정에서 가져옵니다. 다른 감사자는 공개 trust.json과 감사 파일을 전달받되 trust.json의 진위를 별도 경로로 확인해야 합니다. secrets.json과 거래 journal은 공유하지 않습니다.
-
-`profiles.json`의 기본 `asOf: auto`는 최신 로그의 모든 배치가 최종 확정 블록에 포함됐는지 매 감사마다 확인합니다. 포함되면 확정 블록으로 재검증해 `FINALIZED`, 아직이면 `PROVISIONAL`로 표시합니다. 새 기록을 제외하고 성공 처리하지 않습니다. 깊은 reorg의 자동 복구는 미구현입니다.
+강제 종료 후 잠금이 남으면 `operator.lock`의 PID가 종료됐는지 확인한 뒤 잠금만 제거합니다. journal은 삭제하지 않습니다. 장기 pending·revert·수수료 급등은 운영자 조치가 필요합니다.
 
 ### 4. 결과 해석
 

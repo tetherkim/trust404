@@ -27,7 +27,7 @@ main{max-width:1600px;margin:auto;padding:22px 26px}.toolbar{display:flex;align-
 <section class="panel"><div class="panel-head">01 / 감사 파일 입력</div><div class="context">
 <div><label for="file" class="label">감사 파일 · JSON · 최대 2MB</label><p><input type="file" id="file" accept=".json,application/json" disabled></p><span id="file-info" class="code muted">선택된 파일 없음</span></div>
 <div aria-live="polite"><span class="label">자동 확인된 검증 대상 · 읽기 전용</span><p id="profile-name">파일 입력 대기</p><span id="profile-info" class="code muted">—</span></div>
-</div><details><summary>샘플 파일 / 로컬 테스트 체인</summary><p class="code" id="samples"></p><p class="muted">내려받기 → JSON 선택 → 검증. 서버를 다시 시작하면 로컬 샘플이 바뀝니다.</p></details></section>
+</div><details id="sample-section" hidden><summary>샘플 파일 / 로컬 테스트 체인</summary><p class="code" id="samples"></p><p class="muted">내려받기 → JSON 선택 → 검증. 서버를 다시 시작하면 로컬 샘플이 바뀝니다.</p></details></section>
 <div class="stats"><div class="stat"><span class="label">요청 수</span><strong id="count-requests">—</strong></div><div class="stat"><span class="label">온체인 배치</span><strong id="count-batches">—</strong></div><div class="stat"><span class="label">탐지 사항</span><strong id="count-issues">—</strong></div><div class="stat"><span class="label">보관 자료</span><strong id="coverage" style="font-size:13px">—</strong></div></div>
 <section class="panel" aria-live="polite"><div class="panel-head"><span>02 / 감사 결과</span><small id="duration">—</small></div><div class="verdict"><strong id="verdict">실행 전</strong><small id="finality">—</small></div>
 <div class="table-wrap"><table class="matrix"><thead><tr><th>요청 ID</th><th>등록 시점</th><th>기록 / 정책</th><th>판정 / 오류</th></tr></thead><tbody id="requests"></tbody></table></div>

@@ -11,7 +11,8 @@
     "demo:local": "forge build && node --env-file-if-exists=.env src/demo/local.js",
     "check:testnet": "node scripts/check-base-sepolia.js",
     "check:aomi": "node scripts/check-aomi.js",
-    "operator": "node src/operator/run.js"
+    "operator": "node src/operator/run.js",
+    "audit:serve": "node src/demo/audit-server.js"
   },
   "engines": {
     "node": ">=22.22.2"

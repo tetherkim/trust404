@@ -64,11 +64,12 @@ $('run').addEventListener('click', async () => {
   } catch (error) { $('verdict').textContent = ko('ERROR'); $('verdict').className = 'fail'; $('load-error').textContent = error.message; }
   finally { busy = false; $('duration').textContent = `${Math.round(performance.now() - started)} ms`; $('file').disabled = false; ready(); }
 });
+fetch('/api/samples').then(r => r.ok ? r.json() : []).then(items => {
+  $('sample-section').hidden = items.length === 0;
+  for (const {id, name} of items) { const link = document.createElement('a'); link.href = `/api/sample/${id}`; link.textContent = name; link.download = `audit-${id}.json`; link.style.color = '#b49aff'; link.style.marginRight = '18px'; $('samples').append(link); }
+}).catch(() => {});
 fetch('/api/profiles').then(async response => {
   if (!response.ok) throw new Error('PROFILES_UNAVAILABLE'); profiles = await response.json();
   $('file').disabled = false;
-  for (const [id, name] of Object.entries({ rejection: '정상 거절', tamper: '기록 변조', unavailable: '자료 유실', missing: '결과 미등록', wrong: '잘못된 판단' })) {
-    const link = document.createElement('a'); link.href = `/api/sample/${id}`; link.textContent = name; link.download = `audit-${id}.json`; link.style.color = '#b49aff'; link.style.marginRight = '18px'; $('samples').append(link);
-  }
   ready();
 }).catch(error => { $('load-error').textContent = error.message; });
