@@ -205,16 +205,12 @@ sequenceDiagram
 
 `src/evidence.js`는 증거 생성과 독립 검증 함수, `src/cli.js`는 파일 기반 실행 도구입니다. 전체 감사는 로그 전체를 읽는 단순한 구현입니다. 성능보다 요구사항 충족을 우선했습니다.
 
-### Aomi hosted signing 확인 (2026-09-20)
+### Aomi hosted signing 상태 (2026-09-20)
 
-현재 계정의 Privy EVM 지갑 `0xb88122f378189b3dac4efea164181e2191489726`은 Manual입니다. Portal에서 Enable automatic signing → provider 위임 → 해당 지갑 Auto 순서가 표시됩니다. 아직 위임하거나 자동 전송을 검증하지 않았습니다. 이 지갑은 현재 운영 publisher와 다르므로 위임 승인만으로 기존 계약에 등록할 수 없습니다. 새 계약과 별도의 실행 경로 검증이 필요합니다. 표시된 provider 위임이 TRUST404 계약에만 제한된다는 근거는 아직 없습니다.
+직접 RPC 운영 worker는 테스트넷에서 검증했지만, Aomi hosted 자동 전송은 아직 완료되지 않았습니다. Privy 지갑 `0xb88122f378189b3dac4efea164181e2191489726`은 앞선 Portal 확인에서 Auto·위임 만료 2026-09-27로 표시됐습니다. 04:31 UTC 조회 잔액은 0.001 test ETH입니다.
 
-### Aomi 위임 적용 후 검증
+Pipeline의 `custody:delegate` 승인은 완료됐습니다. 04:28 UTC 재현에서 실제 전송 토큰이 승인된 Pipeline grant와 일치함을 해시 지문으로 확인했고, 환경변수·활성 세션에 `accountBearer` override가 없었습니다. 새 `publisher()` Build의 stage/simulate는 성공했으나 commit은 `422 / pipeline_commit_failed`입니다. 이 오류만으로 서버 장애나 단일 원인을 확정하지 않습니다.
 
-2026-09-20 Portal에서 Privy EVM 지갑 `0xb88122f378189b3dac4efea164181e2191489726`의 Auto 정책을 적용했고, 위임 유효일 2026-09-27을 확인했습니다. Base Sepolia의 기존 계약 `publisher()` 호출로 Pipeline stage와 simulate는 통과했지만 CLI commit은 HTTP 422로 거부됐습니다. receipt는 확인되지 않았으며 hosted 자동 전송 성공을 주장하지 않습니다. 해당 Privy 지갑의 test ETH 잔액은 0입니다. 이 사실만으로 422 원인이 잔액이라고 단정할 수 없습니다. 기존 직접 RPC worker와 Aomi hosted 실행은 아직 분리되어 있습니다.
+Agent grant는 별도로 `custody:delegate`가 없으므로 과거 Agent의 scope 오류를 현재 Pipeline의 원인으로 혼동하면 안 됩니다. CLI 계정 조회는 `/api/account`에서 401을 반환해 backend 위임 상태를 확인하지 못했습니다. Privy 지갑은 기존 계약의 publisher와도 다르므로 hosted 전송이 해결된 뒤 실제 기록 계약의 publisher를 맞추는 별도 작업이 필요합니다.
 
-### Pipeline 422 원인 추가 진단
-
-동일한 호출을 Agent 경로로 실행했을 때 `signing_delegated_custody_scope_required` / `this grant does not permit delegated custody; ... reauthorize with custody:delegate` 오류가 반환됐습니다. CLI 0.7.6은 Pipeline POST에 `pipeline:execute`만 자동 요청하고 `custody:delegate`를 추가하지 않습니다. 위임 지갑 Auto 정책과 CLI OAuth scope는 별도입니다. 새 Build 및 0.001 test ETH 충전 이후에도 동일한 422가 재현돼, 만료나 단순 잔액 부족만으로 설명되지 않습니다. 추가 scope 승인 전까지 hosted 서명 성공으로 표시하지 않습니다. 테스트 권한 요청용 CLI 복사본은 로컬 `.git/aomi-tools` 안에만 준비했으며 설치 원본 및 저장소 코드에는 적용하지 않았습니다.
-
-2026-09-20 추가 확인: Pipeline OAuth에 `custody:delegate`를 포함한 device 승인을 완료했습니다. 승인 후 새로 stage/simulate한 Build도 commit에서 동일한 HTTP 422 / `pipeline_commit_failed`를 반환했습니다. 따라서 누락 scope가 유일한 원인이었다고 단정할 수 없습니다. 추가 backend 진단이 필요하며 Aomi hosted 전송은 여전히 미완료입니다.
+민감정보를 제외한 재현 결과와 Aomi 측 확인 항목: [Pipeline 진단 기록](docs/aomi-pipeline-diagnostic.md). 승인·추가 충전·signer 재설치는 반복하지 않았습니다.
