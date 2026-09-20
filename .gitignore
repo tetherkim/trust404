@@ -4,4 +4,9 @@
 demo-output*/
 node_modules/
 
-package-lock.json
+out/
+cache/
+*.sqlite*
+.local-demo/
+.env
+local-baseline-context.json

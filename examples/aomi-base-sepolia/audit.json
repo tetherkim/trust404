@@ -1,0 +1,432 @@
+{
+  "format": "trust404-audit-v1",
+  "profileId": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+  "batches": {
+    "1": [
+      {
+        "kind": "REQUEST",
+        "request": {
+          "domain": "request-v3",
+          "keyId": "requester",
+          "payload": {
+            "amountAtomic": "50000000",
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "createdAtMs": "1789873159327",
+            "institutionId": "testnet-operator",
+            "logId": "operator-4b2ac7775fcc",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "recipient": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "requesterId": "requester",
+            "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+            "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "version": 3
+          },
+          "signature": "M9rzDtBM3spmLxOSM09994Cvu9WP5huWQ0kP8DA5deuf4stiX5uDb35EHSuu1l+Dg8Mctyhl1ti8kz2bLtd6DA=="
+        },
+        "requestId": "0x7fc37fd9d4d2f47eb252403eb44c06a86547283208b3d9181765f8b1263804a2"
+      },
+      {
+        "kind": "REQUEST",
+        "request": {
+          "domain": "request-v3",
+          "keyId": "requester",
+          "payload": {
+            "amountAtomic": "50000000",
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "createdAtMs": "1789873159980",
+            "institutionId": "testnet-operator",
+            "logId": "operator-4b2ac7775fcc",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "recipient": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "requesterId": "requester",
+            "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+            "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "version": 3
+          },
+          "signature": "Tlx1k7Z+W/RCPwoC7jn34kpGrQmeGNd+LxnUuqQoxSiK9Zqar6nbcmewT0PjaMHAqpt2DC/Xbw+naPcOTR4UCA=="
+        },
+        "requestId": "0x0b5845d349858791719039129636bba201c8cfc4ae9a12076b00b234f89cad1e"
+      },
+      {
+        "kind": "REQUEST",
+        "request": {
+          "domain": "request-v3",
+          "keyId": "requester",
+          "payload": {
+            "amountAtomic": "50000000",
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "createdAtMs": "1789873160916",
+            "institutionId": "testnet-operator",
+            "logId": "operator-4b2ac7775fcc",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "recipient": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "requesterId": "requester",
+            "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+            "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "version": 3
+          },
+          "signature": "ELfn8GC4CxpH8Q22eqMMUyyVy7bsyw9yHzG4O7myYSKqibzGfnJXD6AacWakG514YpeOkH69TC7FHN7kzGt9BA=="
+        },
+        "requestId": "0xf602748e21f60d1a64e2885d3af99c54d2c7327b0bbb692d9f04396a495f3952"
+      }
+    ],
+    "2": [
+      {
+        "decision": {
+          "domain": "decision-v3",
+          "keyId": "institution",
+          "payload": {
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "logId": "operator-4b2ac7775fcc",
+            "outcome": "REJECTED",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "reason": "RESERVE_FLOOR",
+            "receiptRef": {
+              "batchId": "1",
+              "blockHash": "0x86eeab48bbcac8f72c977213c9c222b283e5c1a1df27db7cd0f54a3f356bd630",
+              "blockNumber": "47052440",
+              "leafIndex": 0
+            },
+            "requestId": "0x7fc37fd9d4d2f47eb252403eb44c06a86547283208b3d9181765f8b1263804a2",
+            "stateHash": "0xbb9798d02de5597f8124c977aff14eb2604189bf14a93b7dc59870fa9eb8702a",
+            "version": 3
+          },
+          "signature": "OoIkcgozBpzvUCOdqF8pYGnJiGNcfXqpUT8+D9BWDB+Qt4Ws0+FsRhYRApVjB6BkZNO00aTkYf00KeUbuwy+DA=="
+        },
+        "kind": "DECISION"
+      },
+      {
+        "decision": {
+          "domain": "decision-v3",
+          "keyId": "institution",
+          "payload": {
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "logId": "operator-4b2ac7775fcc",
+            "outcome": "REJECTED",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "reason": "RESERVE_FLOOR",
+            "receiptRef": {
+              "batchId": "1",
+              "blockHash": "0x86eeab48bbcac8f72c977213c9c222b283e5c1a1df27db7cd0f54a3f356bd630",
+              "blockNumber": "47052440",
+              "leafIndex": 1
+            },
+            "requestId": "0x0b5845d349858791719039129636bba201c8cfc4ae9a12076b00b234f89cad1e",
+            "stateHash": "0x99283d1cfcbe316f855146acef8864349c9cb48350992202bf878e26cff82bea",
+            "version": 3
+          },
+          "signature": "/ZHwMl+u3xAZfKlcXZn8MMyBgjdhOewyatR7H+pyvzz78gUS4g3xZ3tpBk5nA8k5VJPfU+aRRD9Gv39ytzm8Bg=="
+        },
+        "kind": "DECISION"
+      },
+      {
+        "decision": {
+          "domain": "decision-v3",
+          "keyId": "institution",
+          "payload": {
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "logId": "operator-4b2ac7775fcc",
+            "outcome": "REJECTED",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "reason": "RESERVE_FLOOR",
+            "receiptRef": {
+              "batchId": "1",
+              "blockHash": "0x86eeab48bbcac8f72c977213c9c222b283e5c1a1df27db7cd0f54a3f356bd630",
+              "blockNumber": "47052440",
+              "leafIndex": 2
+            },
+            "requestId": "0xf602748e21f60d1a64e2885d3af99c54d2c7327b0bbb692d9f04396a495f3952",
+            "stateHash": "0x6e1549a51c910720add86c4fb915f3a56790928df750a37abc22e40b20381e2c",
+            "version": 3
+          },
+          "signature": "rv753uWf2xiGq9dyjCMNYEKXRfj5iQQRjL81wz5gvbN6V6fYP7g6iwiQPS7EEQ1voq7Jm41rSgs5oFGUrBcJBg=="
+        },
+        "kind": "DECISION"
+      }
+    ],
+    "3": [
+      {
+        "kind": "REQUEST",
+        "request": {
+          "domain": "request-v3",
+          "keyId": "requester",
+          "payload": {
+            "amountAtomic": "50000000",
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "createdAtMs": "1789879079677",
+            "institutionId": "testnet-operator",
+            "logId": "operator-4b2ac7775fcc",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "recipient": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "requesterId": "requester",
+            "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+            "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "version": 3
+          },
+          "signature": "r1LldqGn1L95YTEeln15ACsd6U1EY6X8obw1dszug31gcH/0n1YauNmWB/GC8J9Y5xJngDAaIKdGf16WtzDkCw=="
+        },
+        "requestId": "0xff827530d79d250ec6ca2596fa093dbcbaa1bb73209f5991b52266c940411d9e"
+      }
+    ],
+    "4": [
+      {
+        "decision": {
+          "domain": "decision-v3",
+          "keyId": "institution",
+          "payload": {
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "logId": "operator-4b2ac7775fcc",
+            "outcome": "REJECTED",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "reason": "RESERVE_FLOOR",
+            "receiptRef": {
+              "batchId": "3",
+              "blockHash": "0x8c183123f5d29d050a3e797e9991e55cd2e43686d4a96cddbf05a9879496573d",
+              "blockNumber": "47055400",
+              "leafIndex": 0
+            },
+            "requestId": "0xff827530d79d250ec6ca2596fa093dbcbaa1bb73209f5991b52266c940411d9e",
+            "stateHash": "0x1f8db973196d63e6ad31ac03c824af523c6a37319168e299e52dd6d15071fee6",
+            "version": 3
+          },
+          "signature": "wPVhRP59ZnAeVTPSRJJoiXrbCTvcRYsbt4Pu69dG9ltON0xVOPVMttdZCAk7V/BCAuyPr6J8+57goVJrr4sZAQ=="
+        },
+        "kind": "DECISION"
+      }
+    ],
+    "5": [
+      {
+        "kind": "REQUEST",
+        "request": {
+          "domain": "request-v3",
+          "keyId": "requester",
+          "payload": {
+            "amountAtomic": "50000000",
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "createdAtMs": "1789880880512",
+            "institutionId": "testnet-operator",
+            "logId": "operator-4b2ac7775fcc",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "recipient": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "requesterId": "requester",
+            "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+            "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "version": 3
+          },
+          "signature": "8vwNUeAAGJqbo98/EyK4vGzcrS/euleNzqgJgcijUOyyctvoAo0Iua9Ech2b/dboCSk1eoVdYkqSAcWOSA/rCg=="
+        },
+        "requestId": "0xbbedef1b8092314d9371817e517ebcd9f71d106d9561725f44b8a8b90001fa28"
+      }
+    ],
+    "6": [
+      {
+        "decision": {
+          "domain": "decision-v3",
+          "keyId": "institution",
+          "payload": {
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "logId": "operator-4b2ac7775fcc",
+            "outcome": "REJECTED",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "reason": "RESERVE_FLOOR",
+            "receiptRef": {
+              "batchId": "5",
+              "blockHash": "0x198c6c1559f82505895b06bb5e3a6a291f6aa9cfe64747b45f6b200dd80469d9",
+              "blockNumber": "47056317",
+              "leafIndex": 0
+            },
+            "requestId": "0xbbedef1b8092314d9371817e517ebcd9f71d106d9561725f44b8a8b90001fa28",
+            "stateHash": "0x299fb45e0ee23ce3314d11ef402d631e8af594f515f40c26e61f8a6155e9afa6",
+            "version": 3
+          },
+          "signature": "pfiERjOl4qBgiNq+EiBDjO6OZcT0pe3a+MeMsuIjyE6kfKXYbiasZWqF7EXDs8j92QgNwexhzV4hFG/5bjqMBA=="
+        },
+        "kind": "DECISION"
+      }
+    ],
+    "7": [
+      {
+        "kind": "REQUEST",
+        "request": {
+          "domain": "request-v3",
+          "keyId": "requester",
+          "payload": {
+            "amountAtomic": "50000000",
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "createdAtMs": "1789881593296",
+            "institutionId": "testnet-operator",
+            "logId": "operator-4b2ac7775fcc",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "recipient": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "requesterId": "requester",
+            "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+            "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+            "version": 3
+          },
+          "signature": "4ukVfRgTths27Uqd/aA9etuDpaTl0r4lOg3sKdWw6tqt1CWFtfYLtFHYqZ4C+VeOoWSjWiMr/BjVhWuhKK68Ag=="
+        },
+        "requestId": "0x4df6fa19861c5db779f31ab86606f6f4dfe4710a501f8c82b1f4209acc618415"
+      }
+    ],
+    "8": [
+      {
+        "decision": {
+          "domain": "decision-v3",
+          "keyId": "institution",
+          "payload": {
+            "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+            "chainId": "84532",
+            "logId": "operator-4b2ac7775fcc",
+            "outcome": "REJECTED",
+            "policyHash": "0x71fcd6bd78d81d1b97374656e2fa03234d517259956ed728e877d71acddaafcd",
+            "reason": "RESERVE_FLOOR",
+            "receiptRef": {
+              "batchId": "7",
+              "blockHash": "0x3b54cab68cbee8efa9d9ec03a02401810ae5469433987d43aed48c234642387e",
+              "blockNumber": "47056671",
+              "leafIndex": 0
+            },
+            "requestId": "0x4df6fa19861c5db779f31ab86606f6f4dfe4710a501f8c82b1f4209acc618415",
+            "stateHash": "0xe3ffabbc5b5b30eef42407b136c06015f13d55175b09337f991965078549c9ee",
+            "version": 3
+          },
+          "signature": "rqGhO9DwwtFZ5xDdKNhv8Ritdg1KkCuugzxPD06DciXbgQMJeRt0JzoP8abokOy0tlDd6Ba5I6QcDpMljK9OAg=="
+        },
+        "kind": "DECISION"
+      }
+    ]
+  },
+  "blobs": {
+    "0xbb9798d02de5597f8124c977aff14eb2604189bf14a93b7dc59870fa9eb8702a": {
+      "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+      "args": [
+        "0x2e11a6b3b17a04a5a686f1195af64677623d116b"
+      ],
+      "balanceAtomic": "0",
+      "chainId": "84532",
+      "logId": "operator-4b2ac7775fcc",
+      "method": "balanceOf",
+      "receiptRef": {
+        "batchId": "1",
+        "blockHash": "0x86eeab48bbcac8f72c977213c9c222b283e5c1a1df27db7cd0f54a3f356bd630",
+        "blockNumber": "47052440",
+        "leafIndex": 0
+      },
+      "requestId": "0x7fc37fd9d4d2f47eb252403eb44c06a86547283208b3d9181765f8b1263804a2",
+      "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+      "version": 3
+    },
+    "0x99283d1cfcbe316f855146acef8864349c9cb48350992202bf878e26cff82bea": {
+      "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+      "args": [
+        "0x2e11a6b3b17a04a5a686f1195af64677623d116b"
+      ],
+      "balanceAtomic": "0",
+      "chainId": "84532",
+      "logId": "operator-4b2ac7775fcc",
+      "method": "balanceOf",
+      "receiptRef": {
+        "batchId": "1",
+        "blockHash": "0x86eeab48bbcac8f72c977213c9c222b283e5c1a1df27db7cd0f54a3f356bd630",
+        "blockNumber": "47052440",
+        "leafIndex": 1
+      },
+      "requestId": "0x0b5845d349858791719039129636bba201c8cfc4ae9a12076b00b234f89cad1e",
+      "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+      "version": 3
+    },
+    "0x6e1549a51c910720add86c4fb915f3a56790928df750a37abc22e40b20381e2c": {
+      "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+      "args": [
+        "0x2e11a6b3b17a04a5a686f1195af64677623d116b"
+      ],
+      "balanceAtomic": "0",
+      "chainId": "84532",
+      "logId": "operator-4b2ac7775fcc",
+      "method": "balanceOf",
+      "receiptRef": {
+        "batchId": "1",
+        "blockHash": "0x86eeab48bbcac8f72c977213c9c222b283e5c1a1df27db7cd0f54a3f356bd630",
+        "blockNumber": "47052440",
+        "leafIndex": 2
+      },
+      "requestId": "0xf602748e21f60d1a64e2885d3af99c54d2c7327b0bbb692d9f04396a495f3952",
+      "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+      "version": 3
+    },
+    "0x1f8db973196d63e6ad31ac03c824af523c6a37319168e299e52dd6d15071fee6": {
+      "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+      "args": [
+        "0x2e11a6b3b17a04a5a686f1195af64677623d116b"
+      ],
+      "balanceAtomic": "0",
+      "chainId": "84532",
+      "logId": "operator-4b2ac7775fcc",
+      "method": "balanceOf",
+      "receiptRef": {
+        "batchId": "3",
+        "blockHash": "0x8c183123f5d29d050a3e797e9991e55cd2e43686d4a96cddbf05a9879496573d",
+        "blockNumber": "47055400",
+        "leafIndex": 0
+      },
+      "requestId": "0xff827530d79d250ec6ca2596fa093dbcbaa1bb73209f5991b52266c940411d9e",
+      "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+      "version": 3
+    },
+    "0x299fb45e0ee23ce3314d11ef402d631e8af594f515f40c26e61f8a6155e9afa6": {
+      "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+      "args": [
+        "0x2e11a6b3b17a04a5a686f1195af64677623d116b"
+      ],
+      "balanceAtomic": "0",
+      "chainId": "84532",
+      "logId": "operator-4b2ac7775fcc",
+      "method": "balanceOf",
+      "receiptRef": {
+        "batchId": "5",
+        "blockHash": "0x198c6c1559f82505895b06bb5e3a6a291f6aa9cfe64747b45f6b200dd80469d9",
+        "blockNumber": "47056317",
+        "leafIndex": 0
+      },
+      "requestId": "0xbbedef1b8092314d9371817e517ebcd9f71d106d9561725f44b8a8b90001fa28",
+      "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+      "version": 3
+    },
+    "0xe3ffabbc5b5b30eef42407b136c06015f13d55175b09337f991965078549c9ee": {
+      "anchorAddress": "0x4b2ac7775fccc52b9b87a49163077b2e19273d96",
+      "args": [
+        "0x2e11a6b3b17a04a5a686f1195af64677623d116b"
+      ],
+      "balanceAtomic": "0",
+      "chainId": "84532",
+      "logId": "operator-4b2ac7775fcc",
+      "method": "balanceOf",
+      "receiptRef": {
+        "batchId": "7",
+        "blockHash": "0x3b54cab68cbee8efa9d9ec03a02401810ae5469433987d43aed48c234642387e",
+        "blockNumber": "47056671",
+        "leafIndex": 0
+      },
+      "requestId": "0x4df6fa19861c5db779f31ab86606f6f4dfe4710a501f8c82b1f4209acc618415",
+      "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "treasury": "0x2e11a6b3b17a04a5a686f1195af64677623d116b",
+      "version": 3
+    }
+  }
+}
