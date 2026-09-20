@@ -1,3 +1,4 @@
+import { auditView } from '../v3/finality.js';
 import { check, canonical } from '../v3/crypto.js';
 import { auditAll } from '../v3/verify.js';
 import { ChainReader, jsonRpc } from '../v3/chain.js';
@@ -23,7 +24,7 @@ export async function auditFile(input, profiles) {
   check(Object.keys(input.batches).length <= 1000 && Object.keys(input.blobs).length <= 10000, 'FILE_TOO_LARGE');
   // Neither endpoint, trust keys, nor the audit cutoff can be supplied by the file.
   const reader = new ChainReader(jsonRpc(profile.rpcUrl), profile.trust);
-  const chain = await reader.at(profile.asOf ?? 'finalized');
+  const chain = profile.asOf === 'auto' ? await auditView(reader) : await reader.at(profile.asOf ?? 'finalized');
   check(BigInt(await chain.count()) <= 1000n, 'AUDIT_LIMIT_EXCEEDED');
   const archive = {
     batch(id) { check(Object.hasOwn(input.batches, id), 'DATA_UNAVAILABLE'); return input.batches[id]; },

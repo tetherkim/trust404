@@ -1,3 +1,4 @@
+import { auditView } from '../v3/finality.js';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, renameSync, openSync, closeSync, unlinkSync, readdirSync, linkSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -66,7 +67,7 @@ export class Operator {
       policyId:'usdc-reserve-v1',ruleVersion:1,institutionId:'testnet-operator',token:this.config.token,decimals:6,treasury:this.account.address.toLowerCase(),
       limitAtomic:'100000000',reserveAtomic:'100000000',decisionWindowSeconds:90,stateRule:'RECEIPT_BLOCK_END'};
     const trust={policy,policyHash:hash('policy-v3',policy),publisher:policy.treasury,codeHash:keccak256(await this.client.getCode({address:anchor})),requesterKeys:{requester:this.secrets.requester.public},institutionKeys:{institution:this.secrets.institution.public}};
-    this.save('trust.json',trust);this.save('profiles.json',[{trustFile:join(this.dir,'trust.json'),rpcUrl:this.config.rpcUrl,asOf:'latest',label:'자동 운영 테스트넷'}]);return anchor;
+    this.save('trust.json',trust);this.save('profiles.json',[{trustFile:join(this.dir,'trust.json'),rpcUrl:this.config.rpcUrl,asOf:'auto',label:'자동 운영 테스트넷'}]);return anchor;
   }
   open(){this.trust=this.load('trust.json');this.archive=new Archive(join(this.dir,'archive'));this.store=new EvidenceStore(join(this.dir,'records.sqlite'),this.archive,this.trust);this.reader=new ChainReader(jsonRpc(this.config.rpcUrl),this.trust);}
   request(amount,id){
@@ -92,7 +93,7 @@ export class Operator {
     const requests=this.store.db.prepare("SELECT request_id FROM entries WHERE kind='REQUEST' AND batch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM entries d WHERE d.kind='DECISION' AND d.request_id=entries.request_id)").all();
     for(const r of requests)await this.store.decide(r.request_id,chain,'institution',this.secrets.institution.private);
     await this.register();
-    const view=await this.reader.at('latest');const count=BigInt(await view.count());const batches={},blobs={};
+    const view=await auditView(this.reader);const count=BigInt(await view.count());const batches={},blobs={};
     for(let id=1n;id<=count;id++){const batch=this.archive.batch(String(id));batches[String(id)]=batch;for(const record of batch){const key=record.decision?.payload.stateHash;if(key)blobs[key]=this.archive.blob(key);}}
     this.save('audit.json',{format:'trust404-audit-v1',profileId:this.trust.policyHash,batches,blobs});
     const result=await auditAll(this.archive,this.trust,view);this.save('audit-result.json',result);return result;

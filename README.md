@@ -80,7 +80,7 @@ npm run demo:local
 
 http://127.0.0.1:4040 에서 `.local-demo/operator/audit.json`을 선택하고 **파일 검증**을 누릅니다. 신뢰 기준의 키/계약 주소는 업로드 파일이 아니라 서버 설정에서 가져옵니다. 다른 감사자는 공개 trust.json과 감사 파일을 전달받되 trust.json의 진위를 별도 경로로 확인해야 합니다. secrets.json과 거래 journal은 공유하지 않습니다.
 
-`profiles.json`의 기본 `asOf: latest`는 최종 확정 전 결과를 `PROVISIONAL`로 표시합니다. 확정 이후 `asOf: finalized`로 변경하고 서버를 재시작하면 확정 블록 기준 감사를 수행합니다. 자동 finality 승격과 깊은 reorg 복구는 아직 구현하지 않았습니다.
+`profiles.json`의 기본 `asOf: auto`는 최신 로그의 모든 배치가 최종 확정 블록에 포함됐는지 매 감사마다 확인합니다. 포함되면 확정 블록으로 재검증해 `FINALIZED`, 아직이면 `PROVISIONAL`로 표시합니다. 새 기록을 제외하고 성공 처리하지 않습니다. 깊은 reorg의 자동 복구는 미구현입니다.
 
 ### 4. 결과 해석
 
@@ -204,3 +204,7 @@ sequenceDiagram
 - [Linera](../reference-projects/linera-protocol/README.md): 외부 체인 앵커 후보를 검토했으나 이번 로컬 시연에는 연동하지 않았습니다.
 
 `src/evidence.js`는 증거 생성과 독립 검증 함수, `src/cli.js`는 파일 기반 실행 도구입니다. 전체 감사는 로그 전체를 읽는 단순한 구현입니다. 성능보다 요구사항 충족을 우선했습니다.
+
+### Aomi hosted signing 확인 (2026-09-20)
+
+현재 계정의 Privy EVM 지갑 `0xb88122f378189b3dac4efea164181e2191489726`은 Manual입니다. Portal에서 Enable automatic signing → provider 위임 → 해당 지갑 Auto 순서가 표시됩니다. 아직 위임하거나 자동 전송을 검증하지 않았습니다. 이 지갑은 현재 운영 publisher와 다르므로 위임 승인만으로 기존 계약에 등록할 수 없습니다. 새 계약과 별도의 실행 경로 검증이 필요합니다. 표시된 provider 위임이 TRUST404 계약에만 제한된다는 근거는 아직 없습니다.
