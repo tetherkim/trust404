@@ -175,6 +175,8 @@ npm run serve
 
 ## 코드 위치와 실행 근거
 
+디렉터리별 책임, 명령별 실행 흐름, 이전 구현과 정리 후보는 [소스 코드 안내](src/README.md)에 정리했습니다.
+
 | 경로 | 역할 |
 | --- | --- |
 | `contracts/RecordAnchor.sol` | 등록 권한과 Merkle root 기록 |

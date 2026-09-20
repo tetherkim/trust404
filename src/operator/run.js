@@ -1,5 +1,5 @@
 import { auditView } from '../v3/finality.js';
-import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { generateKeyPairSync } from 'node:crypto';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, renameSync, openSync, closeSync, unlinkSync, readdirSync, linkSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -142,8 +142,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   else if(command==='deploy')console.log(JSON.stringify({anchor:await op.deploy()}));
   else{
    op.open();
-   if(command==='request')console.log(JSON.stringify(op.request(process.argv[3]??'50000000',process.argv[4]??randomBytes(8).toString('hex'))));
-   else if(command==='aomi-submit'){const {attachAomi}=await import('./aomi.js');await attachAomi(op);console.log(JSON.stringify(await op.submit(process.argv[3],process.argv[4])));}
+   if(command==='aomi-submit'){const {attachAomi}=await import('./aomi.js');await attachAomi(op);console.log(JSON.stringify(await op.submit(process.argv[3],process.argv[4])));}
    else if(command==='submit')console.log(JSON.stringify(await op.submit(process.argv[3],process.argv[4])));
    else if(command==='tick')console.log(JSON.stringify(await op.cycle()));
    else if(command==='run'){
