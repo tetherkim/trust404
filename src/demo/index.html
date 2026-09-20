@@ -24,9 +24,9 @@ main{max-width:1600px;margin:auto;padding:22px 26px}.toolbar{display:flex;align-
 <div class="toolbar"><h1>Evidence Audit <small>JSON ARCHIVE / INDEPENDENT REPLAY</small></h1><button class="primary" id="run" disabled>VERIFY FILE</button></div>
 <div id="load-error" class="error" role="alert"></div>
 <section class="panel"><div class="panel-head">01 / INPUT</div><div class="context">
-<div><label for="file" class="label">AUDIT FILE · JSON · MAX 2 MB</label><p><input type="file" id="file" accept=".json,application/json"></p><span id="file-info" class="code muted">NO FILE SELECTED</span></div>
-<div><label for="profile" class="label">TRUST PROFILE · SERVER CONFIGURED</label><p><select id="profile" style="max-width:100%;background:#21192e;color:#eee;padding:8px"></select></p><span id="profile-info" class="code muted">—</span></div>
-</div><details><summary>SAMPLE FILES / LOCAL TEST CHAIN</summary><p class="code" id="samples"></p><p class="muted">Download → select JSON → confirm profile → verify. Local samples expire when the server restarts.</p></details></section>
+<div><label for="file" class="label">AUDIT FILE · JSON · MAX 2 MB</label><p><input type="file" id="file" accept=".json,application/json" disabled></p><span id="file-info" class="code muted">NO FILE SELECTED</span></div>
+<div aria-live="polite"><span class="label">RESOLVED VERIFICATION TARGET · READ ONLY</span><p id="profile-name">AWAITING FILE</p><span id="profile-info" class="code muted">—</span></div>
+</div><details><summary>SAMPLE FILES / LOCAL TEST CHAIN</summary><p class="code" id="samples"></p><p class="muted">Download → select JSON → verify. Local samples expire when the server restarts.</p></details></section>
 <div class="stats"><div class="stat"><span class="label">REQUESTS</span><strong id="count-requests">—</strong></div><div class="stat"><span class="label">BATCHES ON CHAIN</span><strong id="count-batches">—</strong></div><div class="stat"><span class="label">ISSUES</span><strong id="count-issues">—</strong></div><div class="stat"><span class="label">ARCHIVE</span><strong id="coverage" style="font-size:13px">—</strong></div></div>
 <section class="panel" aria-live="polite"><div class="panel-head"><span>02 / AUDIT RESULT</span><small id="duration">—</small></div><div class="verdict"><strong id="verdict">NOT_RUN</strong><small id="finality">—</small></div>
 <div class="table-wrap"><table class="matrix"><thead><tr><th>REQUEST ID</th><th>REGISTRATION</th><th>RECORD / POLICY</th><th>OUTCOME / ERROR</th></tr></thead><tbody id="requests"></tbody></table></div>

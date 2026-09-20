@@ -165,7 +165,7 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
           res.writeHead(200, { ...headers, 'content-type': path === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8' }).end(path === '/' ? index : js); return;
         }
         let result;
-        if (path === '/api/profiles') result = [...profiles].map(([id, p]) => ({ id, label: p.label, chainId: p.trust.policy.chainId, anchorAddress: p.trust.policy.anchorAddress, cutoff: p.asOf ?? 'finalized' }));
+        if (path === '/api/profiles') result = [...profiles].map(([id, p]) => ({ id, label: p.label, institutionId: p.trust.policy.institutionId, policyId: p.trust.policy.policyId, chainId: p.trust.policy.chainId, anchorAddress: p.trust.policy.anchorAddress, cutoff: p.asOf ?? 'finalized' }));
         else if (path.startsWith('/api/sample/')) {
           const record = records.get(path.slice('/api/sample/'.length));
           check(record, 'UNKNOWN_SAMPLE');

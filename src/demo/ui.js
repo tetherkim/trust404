@@ -6,34 +6,33 @@ function reset() {
   $('verdict').textContent = 'NOT_RUN'; $('verdict').className = ''; $('raw').textContent = 'NOT_RUN';
 }
 function ready() {
-  const profile = profiles.find(p => p.id === $('profile').value);
-  $('run').disabled = busy || !input || profile?.id !== input.profileId;
+  const profile = profiles.find(p => p.id === input?.profileId);
+  $('run').disabled = busy || !profile;
+  $('profile-name').textContent = profile ? `${profile.institutionId} / ${profile.policyId}` : input ? 'UNREGISTERED' : 'AWAITING FILE';
   $('profile-info').textContent = profile ? `CHAIN ${profile.chainId} / ${profile.anchorAddress}` : '—';
 }
 $('file').addEventListener('change', async () => {
   const token = ++generation; input = null; reset(); ready(); $('load-error').textContent = '';
-  const file = $('file').files[0]; if (!file) return;
+  const file = $('file').files[0]; if (!file) { $('file-info').textContent = 'NO FILE SELECTED'; return; }
   $('file-info').textContent = `${file.name} / ${file.size.toLocaleString()} bytes`;
   try {
     if (file.size > 2 * 1024 * 1024) throw new Error('FILE_TOO_LARGE');
     const data = JSON.parse(await file.text()); if (token !== generation) return;
     if (data?.format !== 'trust404-audit-v1') throw new Error('INVALID_FILE_FORMAT');
     input = data;
-    if (!profiles.some(p => p.id === data.profileId)) throw new Error('UNKNOWN_TRUST_PROFILE: configure the trusted deployment on the server.');
-    $('load-error').textContent = data.profileId === $('profile').value ? '' : 'PROFILE_MISMATCH: select the matching trusted deployment.';
+    if (!profiles.some(p => p.id === data.profileId)) $('load-error').textContent = 'UNKNOWN_TRUST_PROFILE · 검증 기준 미등록';
   } catch (error) { if (token === generation) { input = null; $('load-error').textContent = error.message; } }
   ready();
 });
-$('profile').addEventListener('change', () => { generation++; reset(); $('load-error').textContent = input && input.profileId !== $('profile').value ? 'PROFILE_MISMATCH' : ''; ready(); });
 function row(parent, values, header = false) {
   const tr = document.createElement('tr');
   values.forEach((value, i) => { const td = document.createElement(header && i === 0 ? 'th' : 'td'); td.textContent = String(value ?? '—'); tr.append(td); });
   parent.append(tr);
 }
 $('run').addEventListener('click', async () => {
-  if (busy || !input || input.profileId !== $('profile').value) return;
+  if (busy || !input || !profiles.some(p => p.id === input.profileId)) return;
   busy = true; const token = ++generation; reset(); ready();
-  $('file').disabled = $('profile').disabled = true; $('verdict').textContent = 'RUNNING'; $('load-error').textContent = '';
+  $('file').disabled = true; $('verdict').textContent = 'RUNNING'; $('load-error').textContent = '';
   const started = performance.now();
   try {
     const response = await fetch('/api/audit-file', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(120000) });
@@ -55,11 +54,11 @@ $('run').addEventListener('click', async () => {
     }
     for (const pair of [['PROFILE / POLICY HASH', result.profileId], ['CHAIN', result.chainId], ['ANCHOR', result.anchorAddress], ['CUTOFF BLOCK', result.asOf.blockNumber], ['CUTOFF HASH', result.asOf.blockHash]]) row($('references'), pair, true);
   } catch (error) { $('verdict').textContent = 'ERROR'; $('verdict').className = 'fail'; $('load-error').textContent = error.message; }
-  finally { busy = false; $('duration').textContent = `${Math.round(performance.now() - started)} ms`; $('file').disabled = $('profile').disabled = false; ready(); }
+  finally { busy = false; $('duration').textContent = `${Math.round(performance.now() - started)} ms`; $('file').disabled = false; ready(); }
 });
 fetch('/api/profiles').then(async response => {
   if (!response.ok) throw new Error('PROFILES_UNAVAILABLE'); profiles = await response.json();
-  for (const profile of profiles) { const option = document.createElement('option'); option.value = profile.id; option.textContent = `${profile.label} / ${profile.id.slice(0, 10)}`; $('profile').append(option); }
+  $('file').disabled = false;
   for (const [id, name] of Object.entries({ rejection: 'Valid', tamper: 'Tampered', unavailable: 'Unavailable', missing: 'Missing', wrong: 'Wrong decision' })) {
     const link = document.createElement('a'); link.href = `/api/sample/${id}`; link.textContent = name; link.download = `audit-${id}.json`; link.style.color = '#b49aff'; link.style.marginRight = '18px'; $('samples').append(link);
   }
