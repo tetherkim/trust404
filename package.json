@@ -18,6 +18,7 @@
     "node": ">=22.22.2"
   },
   "dependencies": {
+    "@aomi-labs/client": "0.7.6",
     "canonicalize": "5.0.0",
     "viem": "2.56.8"
   }

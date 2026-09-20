@@ -8,7 +8,8 @@
 - 자동 운영: 전용 운영 지갑으로 요청 batch → 블록 상태 조회 → 판단 → 판단 batch → 감사 파일을 생성합니다. 반복 MetaMask 서명은 없습니다.
 - SQLite와 파일 outbox, 배치별 서명 거래 journal로 재시작 및 동일 거래 재전송을 처리합니다.
 - 정상·변조·자료 유실 검증은 기존 수동 지갑으로 Base Sepolia에서 확인했습니다. 새 자동 worker의 3건 처리·재시작·중복 방지는 로컬 Anvil에서 검증했습니다. 자동 지갑으로도 Base Sepolia 계약 배포와 요청 3건의 자동 등록·거절 판단·감사를 확인했습니다 (2026-09-20, PROVISIONAL).
-- 자동 worker는 직접 RPC를 사용합니다. Aomi는 기존 계약 읽기를 검증했으며 자동 서명/전송 경로는 아직 연결하지 않았습니다.
+- `aomi-submit`: Aomi Agent가 거래 구성·포크 시뮬레이션·실행 요청을 담당합니다. 로컬 signer가 원래 배치와 발신자·체인·수신 계약·calldata·value를 대조한 뒤 서명하고, receipt를 Aomi에 돌려줍니다. 실패 시 직접 RPC 경로로 자동 우회하지 않습니다.
+- 서명 키는 전용 로컬 테스트넷 지갑에 있습니다. Aomi의 hosted Privy 자동 서명이나 커스텀 App 배포, x402 유료 호출을 사용한 경로는 아닙니다.
 - 요청자·기관 키는 로컬 시연용입니다. 실제 고객 인증·요청자 키 소유 증명·외부 공개 저장소·운영용 KMS는 미구현입니다.
 
 ## 확인된 자동 운영 테스트넷
@@ -29,6 +30,22 @@ npm ci
 forge build
 npm run test:integration
 ```
+
+## 이미 실행된 파일로 감사해 보기
+
+지갑 없이 실제 Base Sepolia 기록을 검증하려면:
+
+```sh
+npm ci
+npm run audit:serve -- examples/aomi-base-sepolia/profiles.json
+```
+
+http://127.0.0.1:4040 에서 `examples/aomi-base-sepolia/audit.json`을 가져옵니다. 이 예제의 감사 범위는 설정 파일에 고정한 블록의 **배치 1–8**입니다. 이후 추가되는 기록은 이 예제 범위에 포함되지 않습니다. 검증은 파일의 값을 읽고 실제 체인을 조회하며, 결과를 하드코딩하지 않습니다.
+
+- 마지막 요청: Aomi를 거친 [요청 등록](https://sepolia.basescan.org/tx/0xa9f05001d2efd00adb2a2e4af2e7c36863be2cd024311baa28bf77e4a4d6335b) → [판단 등록](https://sepolia.basescan.org/tx/0xe1aa2ff6408a937c7fbb5dc540902ed3d380db5ef3b5b5e8a40441754b4cd43e), 블록 시간 기준 **78초**, `VALID / MATCH / REGISTERED_ON_TIME`.
+- 앞선 복구 요청 1건은 `REGISTERED_LATE`. 따라서 **전체 `ok: false`가 예상 결과**입니다. 지연 이력을 삭제하거나 정상으로 바꾸지 않았습니다.
+- 배치 8의 판단 내용을 바꾸면 `TAMPERED_EXPORT`, 배치 원문을 빼면 `DATA_UNAVAILABLE`. HTTP 파일 가져오기 경로에서 실제 확인했습니다.
+- 확인 당시 `PROVISIONAL`이며, 재검증 시 최종 확정 상태를 다시 조회합니다. 실제 거래·Aomi 응답 확인 결과는 `execution-check.json`에 있습니다. Aomi 실행은 배치 5–8에 해당하며, 앞선 배치 1–4는 직접 RPC로 등록했습니다.
 
 ## 자동 운영 E2E
 
@@ -52,10 +69,14 @@ npm run operator -- deploy
 지갑 충전과 최초 계약 배포를 마친 뒤 실행합니다. 1 USDC = 1000000 최소 단위이며 마지막 값은 중복 방지 키입니다.
 
 ```sh
-npm run operator -- submit 50000000 demo-1
+npm run operator -- aomi-submit 50000000 demo-1
 ```
 
-이 명령은 요청 저장 → 요청 등록 거래 확인 → 등록 블록 상태로 판단 → 판단 등록 거래 확인 → 독립 감사 → 공유용 파일 저장까지 수행합니다. 종료 코드 0과 `status: RECORDED`가 처리 완료 기준입니다. `auditOk`는 감사 결과이며, 이상이 발견돼도 증거 파일은 저장합니다. `PROVISIONAL`은 등록 거래는 확인했지만 체인의 최종 확정은 기다리는 상태입니다. 현재는 정책 판단과 증거 등록만 수행하며, USDC를 실제 송금하지 않습니다.
+이 명령은 요청 저장 → Aomi 구성·시뮬레이션·실행 요청 → 제한된 로컬 서명·요청 등록 확인 → 등록 블록 상태로 판단 → 같은 Aomi 경로로 판단 등록 → 독립 감사 → 공유용 파일 저장까지 수행합니다. 최초 실행은 공식 Aomi CLI로 전용 지갑의 SIWE 로그인을 수행합니다. 브라우저나 개인 MetaMask가 필요하지 않으며, 로그인 세션은 `.local-demo/operator/aomi-session`에만 저장됩니다.
+
+종료 코드 0과 `status: RECORDED`가 처리 완료 기준입니다. `auditOk`는 감사 결과이며, 이상이 발견돼도 증거 파일은 저장합니다. `PROVISIONAL`은 등록 거래는 확인했지만 체인의 최종 확정은 기다리는 상태입니다. 현재는 정책 판단과 증거 등록만 수행하며, USDC를 실제 송금하지 않습니다.
+
+Aomi 모델과 네트워크의 처리 시간은 가변적입니다. 90초 기한을 넘기면 `REGISTERED_LATE`로 탐지하며, 기한 내 완료를 보장하지 않습니다. 이때도 기록과 정책은 별도로 검증합니다.
 
 실패하면 같은 명령·같은 키로 재실행합니다. 저장된 거래 hash를 재확인하고 완료된 요청을 중복 생성하지 않습니다. 다른 금액에 같은 키를 쓰면 거부합니다. `run` worker가 실행 중이라면 먼저 정상 종료한 뒤 `submit`을 사용하세요.
 
@@ -65,6 +86,7 @@ npm run operator -- submit 50000000 demo-1
 - `trust.json`: 기관·요청자 공개키, 정책, 기록 계약. 감사자가 별도 경로로 진위를 확인할 기준.
 - `profiles.json`: 감사 서버 설정. 다른 컴퓨터로 폴더를 옮겨도 상대 경로로 읽습니다.
 - `audit-result.json`: 생성 당시 감사 결과. 나중의 재검증을 대신하지 않습니다.
+- `execution.json`: Aomi 세션·실행 요청 ID·거래 hash·응답 확인 기록. 감사 증명 자체나 Aomi의 암호학적 증명을 대신하지 않는 실행 추적 자료입니다.
 
 개인키·DB·서명 거래 journal은 export에 포함되지 않습니다. `.local-demo/operator` 전체를 공유하지 마세요.
 
@@ -80,7 +102,7 @@ npm run audit:serve -- .local-demo/operator/exports/demo-1/profiles.json
 
 감사는 최신 등록 범위 전체를 확인합니다. export 이후 새 기록이 추가됐다면 오래된 파일은 자료 누락으로 표시될 수 있으므로 최신 export를 전달해야 합니다. `asOf: auto`는 모든 배치가 최종 확정 블록에 포함됐으면 `FINALIZED`, 아직이면 `PROVISIONAL`을 표시합니다. 깊은 reorg 자동 복구는 미구현입니다.
 
-여러 요청을 모아 처리하려면 기존 큐 명령을 사용합니다.
+Aomi 없이 직접 RPC로 실행하는 별도 경로는 `submit`입니다. 아래 `tick`·`run`도 직접 RPC 전용이며 Aomi 시연으로 표시하면 안 됩니다. 여러 요청을 모아 처리하려면 기존 큐 명령을 사용합니다.
 
 ```sh
 npm run operator -- request 50000000 demo-2
@@ -110,6 +132,7 @@ npm run operator -- run
 | 경로 | 역할 |
 |---|---|
 | `src/operator/run.js` | 전용 지갑, 영속 요청 큐, 자동 등록 worker |
+| `src/operator/aomi.js` | Aomi SIWE 로그인, Agent 실행, payload 대조, 실행 응답 복구 |
 | `src/v3/store.js` | SQLite 기록, 배치 고정, 판단 저장 |
 | `src/v3/policy.js` | 서명 검증과 결정론적 판단 |
 | `src/v3/verify.js` | 독립 감사 |

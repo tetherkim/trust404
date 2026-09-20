@@ -1,0 +1,8 @@
+[
+  {
+    "trustFile": "trust.json",
+    "rpcUrl": "https://sepolia.base.org",
+    "asOf": "0x1c7ae8dc42ea18c2c13f66621ab3e4bc9e16c3fef0fc9d856668da03bf34b00d",
+    "label": "Base Sepolia / Aomi 실제 실행 / 배치 1–8"
+  }
+]

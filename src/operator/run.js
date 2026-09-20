@@ -90,11 +90,12 @@ export class Operator {
     // Export public evidence only. Never copy keys, SQLite or signed transaction journals.
     for(const [name,value] of Object.entries({
       'audit.json':this.load('audit.json'),'trust.json':this.trust,'audit-result.json':audit,
+      ...(this.executionMode==='aomi-client'?{'execution.json':{mode:this.executionMode,batches:readdirSync(this.dir).filter(n=>/^aomi-batch-\d+\.json$/.test(n)).map(n=>{const j=this.load(n);return {batchId:n.slice(11,-5),sessionId:j.sessionId,actionId:j.actionId,state:j.state,transactionHash:j.transactionHash,actionResult:j.actionResult};})}}:{}),
       'profiles.json':[{trustFile:'trust.json',rpcUrl:this.config.rpcUrl,asOf:'auto',label:this.trust.policy.logId}],
     })){
       const file=join(folder,name);writeFileSync(file+'.tmp',JSON.stringify(value,null,2)+'\n',{mode:0o600,flush:true});renameSync(file+'.tmp',file);
     }
-    return {request,status:'RECORDED',auditOk:audit.ok,finality:audit.finality,exportDirectory:folder,auditFile:join(folder,'audit.json'),profilesFile:join(folder,'profiles.json')};
+    return {request,status:'RECORDED',executionMode:this.executionMode??'direct-rpc',auditOk:audit.ok,finality:audit.finality,exportDirectory:folder,auditFile:join(folder,'audit.json'),profilesFile:join(folder,'profiles.json')};
   }
   async register(){
     const chain=await this.reader.at('latest');const count=BigInt(await chain.count());
@@ -102,7 +103,7 @@ export class Operator {
     if(!pending)return;
     const batch=await this.store.prepare(chain);const tx=batch.transaction;
     check(tx.to===this.trust.policy.anchorAddress&&tx.chainId===this.trust.policy.chainId&&BigInt(tx.value)===0n&&tx.data.startsWith('0x4257ede9'),'TRANSACTION_OUT_OF_SCOPE');
-    await this.transact(`batch-${batch.batchId}`,{to:tx.to,data:tx.data});
+    await (this.executeBatch??this.transact.bind(this))(`batch-${batch.batchId}`,{to:tx.to,data:tx.data});
   }
   async cycle(){
     for(const name of readdirSync(this.dir).filter(n=>/^request-[a-zA-Z0-9_-]+\.json$/.test(n)))this.store.submit(this.load(name));
@@ -140,6 +141,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   else{
    op.open();
    if(command==='request')console.log(JSON.stringify(op.request(process.argv[3]??'50000000',process.argv[4]??randomBytes(8).toString('hex'))));
+   else if(command==='aomi-submit'){const {attachAomi}=await import('./aomi.js');await attachAomi(op);console.log(JSON.stringify(await op.submit(process.argv[3],process.argv[4])));}
    else if(command==='submit')console.log(JSON.stringify(await op.submit(process.argv[3],process.argv[4])));
    else if(command==='tick')console.log(JSON.stringify(await op.cycle()));
    else if(command==='run'){
