@@ -54,13 +54,21 @@ export class Operator {
       try{await this.client.sendRawTransaction({serializedTransaction:journal.raw});}catch{ /* Check exact saved hash before considering any retry. */ }
       receipt=await this.client.waitForTransactionReceipt({hash:journal.hash,timeout:60000});
     }
-    check(receipt.status==='success','TRANSACTION_REVERTED');
-    let block;
+    let block,lastError,sawMismatch=false;
     for(let attempt=0;;attempt++){
-      try{block=await this.client.getBlock({blockNumber:receipt.blockNumber});break;}
-      catch(error){if(error.name!=='BlockNotFoundError'||attempt>=4)throw error;await new Promise(r=>setTimeout(r,2000));}
+      try{
+        receipt=await this.client.getTransactionReceipt({hash:journal.hash});
+        check(receipt.status==='success','TRANSACTION_REVERTED');
+        block=await this.client.getBlock({blockNumber:receipt.blockNumber});
+        if(block.hash===receipt.blockHash)break;
+        sawMismatch=true;
+      }catch(error){
+        if(!['BlockNotFoundError','TransactionReceiptNotFoundError'].includes(error.name))throw error;
+        lastError=error;
+      }
+      if(attempt>=4){if(sawMismatch)throw Error('REORG');throw lastError;}
+      await new Promise(r=>setTimeout(r,2000));
     }
-    check(block.hash===receipt.blockHash,'REORG');
     return receipt;
   }
   async deploy(){
