@@ -4,7 +4,7 @@ const labels={REJECTED:'거절',APPROVED:'승인',REGISTERED_ON_TIME:'기한 내
 const errors={LOGIN_REQUIRED:'접속 코드를 입력해 주세요.',ACCESS_DENIED:'접속 코드가 맞지 않습니다.',QUEUE_FULL:'대기열이 가득 찼습니다.',DAILY_REQUEST_LIMIT:'하루 요청 한도에 도달했습니다.',OPERATOR_NOT_READY:'운영자 초기 설정이 필요합니다.',RETRY_LIMIT_REACHED:'재시도 한도입니다. 운영자가 기록을 확인해야 합니다.',LOGIN_RATE_LIMIT:'잠시 후 다시 접속해 주세요.'};
 let pendingId=null,pendingAmount=null,refreshTimer,submitting=false;
 try{const saved=JSON.parse(sessionStorage.getItem('trust404-pending')??'null');pendingId=saved?.id;pendingAmount=saved?.amount;}catch{}
-async function api(path,body){const r=await fetch(path,body===undefined?{}:{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(errors[data.error]??data.error??'서버 응답 오류');return data;}
+async function api(path,body){const r=await fetch(path,body===undefined?{}:{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(r.status===401){$('login-panel').hidden=false;$('workspace').hidden=true;clearTimeout(refreshTimer);}if(!r.ok)throw Error(errors[data.error]??data.error??'서버 응답 오류');return data;}
 function amountAtomic(text){if(!/^\d{1,5}(\.\d{1,6})?$/.test(text))throw Error('금액을 소수점 6자리 이내로 입력해 주세요.');const [whole,part='']=text.split('.');const value=BigInt(whole)*1000000n+BigInt(part.padEnd(6,'0'));if(value<=0n||value>10000000000n)throw Error('0 초과 10,000 USDC 이하로 입력해 주세요.');return value.toString();}
 async function refresh(){
  try{const data=await api('/api/status');$('login-panel').hidden=true;$('workspace').hidden=false;$('submit').disabled=!data.ready||data.paused||submitting;

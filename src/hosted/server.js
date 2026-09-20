@@ -62,6 +62,10 @@ export async function startHostedServer({directory,accessCode,origin,port=8080,h
  const headers={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer',
   'content-security-policy':"default-src 'self'; style-src 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"};
  const server=createServer(async(req,res)=>{
+  const serveFile=(path,type,extra={})=>{
+   let content;try{content=readFileSync(path);}catch(error){if(error.code==='ENOENT'){send(404,{error:'FILE_UNAVAILABLE'});return;}throw error;}
+   res.writeHead(200,{...headers,'content-type':type,...extra}).end(content);
+  };
   const send=(status,value,extra={})=>res.writeHead(status,{...headers,'content-type':'application/json',...extra}).end(JSON.stringify(value));
   try{
    const path=new URL(req.url,'http://localhost').pathname;
@@ -81,14 +85,14 @@ export async function startHostedServer({directory,accessCode,origin,port=8080,h
     send(200,{ok:true},{'set-cookie':`trust404_session=${stamp}.${signature(stamp)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=14400${expected.startsWith('https:')?'; Secure':''}`});return;
    }
    const pages={'/':['./portal.html','text/html; charset=utf-8'],'/portal.js':['./portal.js','text/javascript; charset=utf-8'],'/audit':['../demo/index.html','text/html; charset=utf-8'],'/ui.js':['../demo/ui.js','text/javascript; charset=utf-8']};
-   if(req.method==='GET'&&pages[path]){const [file,type]=pages[path];res.writeHead(200,{...headers,'content-type':type}).end(readFileSync(new URL(file,import.meta.url)));return;}
+   if(req.method==='GET'&&pages[path]){const [file,type]=pages[path];serveFile(new URL(file,import.meta.url),type);return;}
    if(!authenticated(req)){send(401,{error:'LOGIN_REQUIRED'});return;}
    if(req.method==='GET'&&path==='/api/status'){
     send(200,{ready:existsSync(join(opDir,'trust.json')),mode:'aomi-client',paused:!!db.prepare("SELECT 1 FROM jobs WHERE state='failed'").get(),jobs:db.prepare('SELECT * FROM jobs ORDER BY created DESC,rowid DESC LIMIT 30').all().map(publicJob)});return;
    }
    if(req.method==='POST'&&path==='/api/requests'){
     check(existsSync(join(opDir,'trust.json')),'OPERATOR_NOT_READY');const {id,amount}=await readUpload(req);
-    check(typeof id==='string'&&/^[a-zA-Z0-9_-]{8,80}$/.test(id),'INVALID_REQUEST_ID');
+    check(typeof id==='string'&&/^[a-zA-Z0-9_-]{8,76}$/.test(id),'INVALID_REQUEST_ID');
     check(typeof amount==='string'&&/^[1-9][0-9]{0,11}$/.test(amount)&&BigInt(amount)<=10000000000n,'INVALID_AMOUNT');
     const existing=db.prepare('SELECT * FROM jobs WHERE id=?').get(id);
     if(existing){check(existing.amount===amount,'IDEMPOTENCY_CONFLICT');send(200,publicJob(existing));return;}
@@ -97,20 +101,20 @@ export async function startHostedServer({directory,accessCode,origin,port=8080,h
     db.prepare("INSERT INTO jobs(id,amount,state,created) VALUES (?,?,'queued',?)").run(id,amount,Date.now());
     send(202,publicJob(db.prepare('SELECT * FROM jobs WHERE id=?').get(id)));pump();return;
    }
-   const retry=path.match(/^\/api\/jobs\/([a-zA-Z0-9_-]{8,80})\/retry$/);
+   const retry=path.match(/^\/api\/jobs\/([a-zA-Z0-9_-]{8,76})\/retry$/);
    if(req.method==='POST'&&retry){
     const job=db.prepare('SELECT * FROM jobs WHERE id=?').get(retry[1]);check(job?.state==='failed','JOB_NOT_FAILED');
     check(job.attempts<3,'RETRY_LIMIT_REACHED');
     db.prepare("UPDATE jobs SET state='queued' WHERE id=?").run(job.id);send(202,{id:job.id,state:'queued'});pump();return;
    }
-   const download=path.match(/^\/api\/jobs\/([a-zA-Z0-9_-]{8,80})\/files\/([a-z-]+\.json)$/);
+   const download=path.match(/^\/api\/jobs\/([a-zA-Z0-9_-]{8,76})\/files\/([a-z-]+\.json)$/);
    if(req.method==='GET'&&download){
     check(publicFiles.has(download[2]),'FILE_NOT_ALLOWED');const job=db.prepare('SELECT state FROM jobs WHERE id=?').get(download[1]);check(job?.state==='done','JOB_NOT_DONE');
-    res.writeHead(200,{...headers,'content-type':'application/json','content-disposition':`attachment; filename="${download[2]}"`}).end(readFileSync(join(opDir,'exports',`web-${download[1]}`,download[2])));return;
+    serveFile(join(opDir,'exports',`web-${download[1]}`,download[2]),'application/json',{'content-disposition':`attachment; filename="${download[2]}"`});return;
    }
    if(req.method==='GET'&&path==='/api/profiles'){send(200,[...profiles()].map(([id,{trust,asOf}])=>({id,institutionId:trust.policy.institutionId,policyId:trust.policy.policyId,chainId:trust.policy.chainId,anchorAddress:trust.policy.anchorAddress,cutoff:asOf})));return;}
    if(req.method==='GET'&&path==='/api/samples'){send(200,[]);return;}
-   if(req.method==='GET'&&path==='/api/example'){res.writeHead(200,{...headers,'content-type':'application/json','content-disposition':'attachment; filename="audit.json"'}).end(readFileSync(join(root,'examples/aomi-base-sepolia/audit.json')));return;}
+   if(req.method==='GET'&&path==='/api/example'){serveFile(join(root,'examples/aomi-base-sepolia/audit.json'),'application/json',{'content-disposition':'attachment; filename="audit.json"'});return;}
    if(req.method==='POST'&&path==='/api/audit-file'){
     if(audits>=2){send(429,{error:'AUDIT_BUSY'});return;}audits++;
     try{send(200,await auditFile(await readUpload(req),profiles()));}finally{audits--;}return;
