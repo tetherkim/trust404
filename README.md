@@ -72,7 +72,64 @@ sequenceDiagram
 
 ---
 
-## 4. 무신뢰 단건 거절 검증 흐름 (Zero-Trust Single Verification Flow)
+## 4. 오프체인 판단 및 검증 가능한 증거 생성 흐름 (Verifiable Evidence Generation Flow)
+
+금융기관이 접수된 요청을 심사하여 거절(또는 승인) 판단을 내리고, 이를 외부 감사관이 독립 검증할 수 있는 **자기완결적 단건 증거 번들(`evidence.json`)**로 조립(Assemble)하는 상세 데이터 파이프라인입니다.
+
+```mermaid
+flowchart TD
+    subgraph Step1 ["1단계: 선(先)요청 앵커링 & 영수증 확정"]
+        UserReq["사용자 요청 생성<br>Ed25519 서명 (request-v3)"]
+        Batch1Tree["요청 머클 트리 집계<br>(RFC 6962 이진 머클 트리)"]
+        Batch1Anchor["RecordAnchor 컨트랙트<br>Batch 1 앵커링 트랜잭션"]
+        ReceiptRef["영수증 참조 획득 (receiptRef)<br>배치ID, 블록N 번호, 블록 해시"]
+
+        UserReq --> Batch1Tree
+        Batch1Tree --> Batch1Anchor
+        Batch1Anchor --> ReceiptRef
+    end
+
+    subgraph Step2 ["2단계: 스냅샷 캡처 & 정책 심사"]
+        ChainState["블록 N 시점 온체인 상태 조회<br>(담보, 부채, 준비금 잔액)"]
+        StateSnap["상태 스냅샷 생성 & 해시화<br>StateSnapshot Blob 및 stateHash"]
+        PolicyEval["결정론적 정책 엔진 실행<br>(LTV 초과 / 준비금 미달 확인)"]
+        Outcome["판단 도출 (DECISION)<br>결과: REJECTED, 사유: RESERVE_FLOOR"]
+
+        ChainState --> StateSnap
+        ReceiptRef --> PolicyEval
+        StateSnap --> PolicyEval
+        PolicyEval --> Outcome
+    end
+
+    subgraph Step3 ["3단계: 판단 서명 & 후(後)앵커링"]
+        SignDecision["판단 레코드 기관 서명 날인<br>receiptRef + stateHash 강제 바인딩"]
+        Batch2Tree["판단 머클 트리 집계<br>(RFC 6962 이진 머클 트리)"]
+        Batch2Anchor["RecordAnchor 컨트랙트<br>Batch 2 앵커링 트랜잭션"]
+
+        Outcome --> SignDecision
+        SignDecision --> Batch2Tree
+        Batch2Tree --> Batch2Anchor
+    end
+
+    subgraph Step4 ["4단계: 자기완결적 증거 번들 패키징"]
+        EvidenceBundle["단건 검증 증거 파일 (evidence.json)<br>1. 요청 레코드 및 사용자 서명<br>2. 요청 머클 포함 증명 (Proof 1)<br>3. 판단 레코드 및 기관 서명<br>4. 판단 머클 포함 증명 (Proof 2)<br>5. 블록 N 상태 스냅샷 원문 블롭"]
+
+        UserReq -.-> EvidenceBundle
+        Batch1Tree -.->|Proof 1 생성| EvidenceBundle
+        SignDecision -.-> EvidenceBundle
+        Batch2Tree -.->|Proof 2 생성| EvidenceBundle
+        StateSnap -.->|Snapshot Blob| EvidenceBundle
+    end
+```
+
+### 증거 생성 파이프라인의 핵심 불변식 (Invariants)
+1. **원천 요청의 선(先) 확정**: 판단이 내려지기 전, 사용자 요청이 먼저 온체인(Batch 1)에 영구 기록되어 고유한 `receiptRef`(배치 ID, 인덱스, 블록 번호, 블록 해시)가 발급됩니다. 기관은 접수된 요청을 임의로 누락하거나 사후에 교체할 수 없습니다.
+2. **동일 시점 온체인 상태 바인딩**: 블록 N 시점의 온체인 상태 스냅샷에 대한 해시값(`stateHash`)이 기관의 판단문(`decision-v3`) 내부에 불변으로 포함되어 서명됩니다. 따라서 기관이 사후에 변경된 상태를 핑계로 거짓 사유를 둘러댈 수 없습니다.
+3. **독립적 증명력의 완결성 (Self-Contained Bundle)**: 생성된 `evidence.json` 파일에는 두 건의 머클 포함 증명(요청용, 판단용)과 당시 상태 블롭이 함께 포함되어 있어, 수신자는 기관 DB 접근 없이 오직 퍼블릭 RPC와 신뢰 프로필(`trust.json`)만으로 진위를 100% 검증할 수 있습니다.
+
+---
+
+## 5. 무신뢰 단건 거절 검증 흐름 (Zero-Trust Single Verification Flow)
 
 외부 감사관이나 사용자가 기관의 서버나 DB에 일절 접속하지 않고, 오직 자신에게 전달된 영수증과 퍼블릭 블록체인만으로 1건의 거절을 독립 검증하는 과정입니다.
 
@@ -109,7 +166,7 @@ flowchart TD
 
 ---
 
-## 5. 사후 조작·삭제·누락 탐지 흐름 (Tampering, Deletion & Omission Detection Flow)
+## 6. 사후 조작·삭제·누락 탐지 흐름 (Tampering, Deletion & Omission Detection Flow)
 
 악의적인 기관이 사후에 특정 기록을 위변조하거나, 불리한 요청을 은폐/삭제하거나, 결과를 고의로 누락했을 때 시스템이 이를 적발하는 매커니즘입니다.
 
@@ -149,7 +206,7 @@ flowchart LR
 
 ---
 
-## 6. 4대 보안 원칙 구현 실증 및 코드 위치 (Core Guarantees)
+## 7. 4대 보안 원칙 구현 실증 및 코드 위치 (Core Guarantees)
 
 Guardrail은 시스템 소프트웨어 및 암호학의 4대 보안 원칙을 충족하도록 구현되었으며, 모든 항목은 자동화된 테스트 코드로 검증됩니다.
 
@@ -162,7 +219,7 @@ Guardrail은 시스템 소프트웨어 및 암호학의 4대 보안 원칙을 �
 
 ---
 
-## 7. 보안적 타당성 및 위협 모델 (Security Model & Threat Boundaries)
+## 8. 보안적 타당성 및 위협 모델 (Security Model & Threat Boundaries)
 
 ### 1) 방어하는 위협 모델 (Threats Mitigated)
 - **사후 위변조 (Post-decision Tampering)**: 기관이 감사 시점에 유리하도록 과거 거절 사유나 승인 내역을 조작하는 위협 ➜ 온체인 Merkle Root 대조로 방어.
@@ -178,7 +235,7 @@ Guardrail은 시스템 소프트웨어 및 암호학의 4대 보안 원칙을 �
 
 ---
 
-## 8. 빠른 시작 및 테스트 가이드 (Quickstart)
+## 9. 빠른 시작 및 테스트 가이드 (Quickstart)
 
 ### 1) 사전 설치 요구사항 (Prerequisites)
 
@@ -269,14 +326,14 @@ npm run serve
 
 ---
 
-## 9. 그외 문서
+## 10. 그외 문서
 
 - **[코어 아키텍처 상세 명세서 (src/README.md)](src/README.md)**: 모듈별 책임, RFC 규격, 에러 코드 매트릭스
 - **[시연 및 데모 런북 (demo/README.md)](demo/README.md)**: 5대 시나리오 검증 매트릭스 및 상세 실행 안내
 
 ---
 
-## 10. 부록 (Appendix)
+## 11. 부록 (Appendix)
 
 ### 1) 디렉터리 및 모듈 구조 상세
 
