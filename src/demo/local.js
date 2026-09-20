@@ -130,6 +130,7 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
         }
         writeFileSync(join(dir, 'trust.json'), canonical(trust), { mode: 0o600 });
         writeFileSync(join(dir, 'audit-config.json'), JSON.stringify({ rpcUrl, trustFile: join(dir, 'trust.json'), archiveDirectory: auditArchive.directory }), { mode: 0o600 });
+        if (scenario.id === 'rejection') writeFileSync(join(dir, 'evidence.json'), canonical(store.bundle(request.requestId)), { mode: 0o600 });
         records.set(scenario.id, { trust, auditArchive, asOf, info: { ...scenario, requestId: request.requestId, anchorAddress,
           requestTransaction: requestTx.transactionHash, decisionTransaction: decisionTx?.transactionHash ?? null,
           policyId: policy.policyId, policyHash: trust.policyHash, token, treasury,

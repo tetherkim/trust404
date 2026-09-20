@@ -8,7 +8,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { baseSepolia } from 'viem/chains';
 import { Archive, EvidenceStore } from '../v3/store.js';
 import { ChainReader, jsonRpc } from '../v3/chain.js';
-import { hash, check } from '../v3/crypto.js';
+import { hash, check, canonical } from '../v3/crypto.js';
 import { scope, requestRecord } from '../v3/policy.js';
 import { auditAll } from '../v3/verify.js';
 
@@ -90,10 +90,12 @@ export class Operator {
     // Export public evidence only. Never copy keys, SQLite or signed transaction journals.
     for(const [name,value] of Object.entries({
       'audit.json':this.load('audit.json'),'trust.json':this.trust,'audit-result.json':audit,
+      'evidence.json':this.store.bundle(request.requestId),
+      'verify-config.json':{trustFile:'trust.json',rpcUrl:this.config.rpcUrl,asOf:audit.asOf.blockHash},
       ...(this.executionMode==='aomi-client'?{'execution.json':{mode:this.executionMode,batches:readdirSync(this.dir).filter(n=>/^aomi-batch-\d+\.json$/.test(n)).map(n=>{const j=this.load(n);return {batchId:n.slice(11,-5),sessionId:j.sessionId,actionId:j.actionId,state:j.state,transactionHash:j.transactionHash,actionResult:j.actionResult};})}}:{}),
       'profiles.json':[{trustFile:'trust.json',rpcUrl:this.config.rpcUrl,asOf:'auto',label:this.trust.policy.logId}],
     })){
-      const file=join(folder,name);writeFileSync(file+'.tmp',JSON.stringify(value,null,2)+'\n',{mode:0o600,flush:true});renameSync(file+'.tmp',file);
+      const file=join(folder,name);writeFileSync(file+'.tmp',name==='evidence.json'?canonical(value):JSON.stringify(value,null,2)+'\n',{mode:0o600,flush:true});renameSync(file+'.tmp',file);
     }
     return {request,status:'RECORDED',executionMode:this.executionMode??'direct-rpc',auditOk:audit.ok,finality:audit.finality,exportDirectory:folder,auditFile:join(folder,'audit.json'),profilesFile:join(folder,'profiles.json')};
   }

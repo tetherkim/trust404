@@ -11,6 +11,8 @@
 
 현재는 **테스트넷 시연용 프로토타입**입니다. 승인·거절 판단과 증거 등록을 수행하며 USDC를 실제 송금하지는 않습니다. 요청자·기관 키도 시연용이며, 고객 인증·운영용 키 관리·외부 공개 저장소는 미구현입니다.
 
+목표별 구현 근거, 서명·증거 스키마와 신뢰 경계는 [AIM 목표와 검증 근거](AIM-COVERAGE.md)에 정리했습니다. 실제 고객의 부인 방지는 고객이 자신의 개인키를 독립적으로 통제한다는 전제가 필요하며, 서버가 역할별 키를 보관하는 현재 웹 데모는 이를 모의합니다.
+
 ## Aomi는 어디에 사용하는가
 
 ```text
@@ -64,6 +66,12 @@ npm run audit:serve -- examples/aomi-base-sepolia/profiles.json
 
 ## 3. 코드 테스트
 
+AIM의 핵심 시연은 다음 한 명령으로 재현합니다. **기관 DB는 보존하되 별도 검증 프로세스의 접근 권한을 차단**하고, 전달받은 증거와 로컬 체인만으로 거절 한 건·변조·삭제·미등록 판단을 확인합니다. 이 명령이 만든 임시 자료만 종료 시 정리합니다. Aomi 계정이나 test ETH는 필요 없습니다.
+
+```sh
+npm run demo:aim
+```
+
 Foundry가 필요합니다. 일부 Node 테스트도 컨트랙트 산출물과 Anvil을 사용하므로 먼저 빌드합니다. test ETH는 필요 없습니다.
 
 ```sh
@@ -104,6 +112,8 @@ npm run operator -- aomi-submit 50000000 demo-1
 | 파일 | 용도 |
 | --- | --- |
 | `audit.json` | 감사 화면에 가져올 요청·판단·상태 증거 |
+| `evidence.json` | 해당 요청 한 건의 요청·판단 서명, Merkle 포함 증명, 상태 증거 |
+| `verify-config.json` | 단건 CLI 검증 설정. 상대 경로의 `trust.json`과 생성 시점의 기준 블록 참조 |
 | `trust.json` | 공개키·정책·계약 등 감사자가 별도 경로로 확인할 신뢰 기준 |
 | `profiles.json` | 감사 서버 설정. `trust.json`을 상대 경로로 참조 |
 | `audit-result.json` | 생성 당시 감사 결과 |
@@ -118,6 +128,14 @@ npm run audit:serve -- received/demo-1/profiles.json
 ```
 
 브라우저에서 받은 `audit.json`을 가져옵니다. 발급자의 DB·개인키·Aomi 계정은 필요 없습니다. 감사자는 공개키·정책·계약의 진위를 별도 경로로 확인해야 하며, 파일을 받았다는 사실만으로 그 기준을 신뢰하면 안 됩니다. 업로드 파일이 스스로 신뢰 기준이나 RPC를 선택하지는 못합니다.
+
+**한 건만 독립 검증**하려면 받은 `trust.json`과 `verify-config.json`의 공개키·계약·RPC·기준 블록을 별도 경로로 확인한 뒤 실행합니다. 기관 서버에 접속하지 않으며 파일과 공개 체인 RPC만 사용합니다.
+
+```sh
+npm run evidence -- verify received/demo-1/verify-config.json received/demo-1/evidence.json
+```
+
+설정 안의 파일 경로는 설정 파일이 있는 폴더 기준입니다. 단건 파일은 서명 검증용 정규 JSON으로 내보내므로 그대로 전달합니다. `ok: true`, `outcome: REJECTED`는 거절 기록·규칙이 일치한다는 뜻입니다. 등록 지연은 `timing`, 최종 확정 여부는 `finality`로 따로 확인합니다. 단건 검증만으로 전체 기록의 누락 여부를 판단하지 않습니다. 기존 export에 단건 파일이 없다면 전체 `audit.json` 감사를 사용하거나, 기존 요청과 같은 금액·중복 방지 키로 다시 export합니다.
 
 새로 생성한 export는 최신 등록 범위를 감사합니다. 이후 배치가 추가됐다면 예전 파일은 누락으로 표시될 수 있으므로 최신 export를 전달합니다. 처음부터 외부에 등록되지 않은 요청은 이 방식으로 탐지할 수 없습니다.
 

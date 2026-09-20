@@ -12,7 +12,7 @@ import {check} from '../v3/crypto.js';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const equal=(a,b)=>timingSafeEqual(createHash('sha256').update(a).digest(),createHash('sha256').update(b).digest());
-const publicFiles=new Set(['audit.json','trust.json','profiles.json','audit-result.json','execution.json']);
+const publicFiles=new Set(['audit.json','trust.json','profiles.json','audit-result.json','execution.json','evidence.json','verify-config.json']);
 
 export async function startHostedServer({directory,accessCode,origin,port=8080,host='0.0.0.0',runJob}={}) {
  check(typeof accessCode==='string'&&accessCode.length>=24,'ACCESS_CODE_TOO_SHORT');

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {spawn} from 'node:child_process';
-import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {fileURLToPath} from 'node:url';
+import {mkdtempSync,rmSync,readFileSync,cpSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from 'node:net';
@@ -11,6 +13,7 @@ import {createWalletClient,http} from 'viem';
 import {mnemonicToAccount} from 'viem/accounts';
 import {startAuditServer} from '../../src/demo/audit-server.js';
 import {Operator} from '../../src/operator/run.js';
+import {canonical} from '../../src/v3/crypto.js';
 
 test('automatic operator handles three requests, replay and process restart without duplicate batches', {timeout:60000}, async t=>{
  const socket=createServer();socket.listen(0,'127.0.0.1');await once(socket,'listening');const port=socket.address().port;await new Promise(r=>socket.close(r));
@@ -52,4 +55,21 @@ test('automatic operator handles three requests, replay and process restart with
  assert.equal((await fetch(base+'/api/audit-file',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(unknown)})).status,400);
  const journal=op.load('tx-batch-2.json');const count=await op.client.getTransactionCount({address:identity.address});
  await op.transact('batch-2',{to:journal.to,data:journal.data});assert.equal(await op.client.getTransactionCount({address:identity.address}),count);
+ // Move only public exports to another working directory; CLI resolves the trust
+ // file relative to the config and honors its pinned block, not the current cwd.
+ const received=mkdtempSync(join(tmpdir(),'trust404-received-'));
+ t.after(()=>rmSync(received,{recursive:true,force:true}));
+ cpSync(completed.exportDirectory,received,{recursive:true});
+ op.close();op=null;
+ const cli=fileURLToPath(new URL('../../src/v3/cli.js',import.meta.url));
+ const args=[cli,'verify','verify-config.json','evidence.json'];
+ const run=()=>promisify(execFile)(process.execPath,args,{cwd:received,timeout:10000});
+ const verified=JSON.parse((await run()).stdout);
+ assert.equal(verified.ok,true);assert.equal(verified.outcome,'REJECTED');
+ const verifyConfig=JSON.parse(readFileSync(join(received,'verify-config.json')));
+ assert.equal(verified.asOf.blockHash,verifyConfig.asOf);
+ const evidence=JSON.parse(readFileSync(join(received,'evidence.json')));
+ evidence.decision.record.decision.payload.reason='FORGED';
+ writeFileSync(join(received,'evidence.json'),canonical(evidence));
+ await assert.rejects(run(),error=>error.code===1&&/INVALID_INCLUSION/.test(error.stderr));
 });

@@ -7,7 +7,7 @@ import { validateRequest, makeDecision, receiptRef } from './policy.js';
 import { anchorCall } from './chain.js';
 
 export class Archive {
-  constructor(directory) { this.directory = directory; mkdirSync(directory, { recursive: true }); }
+  constructor(directory) { this.directory = directory; if (!existsSync(directory)) mkdirSync(directory, { recursive: true }); }
   path(kind, id) {
     check(kind === 'batch' ? /^[1-9][0-9]*$/.test(String(id)) : hashShape(id), 'INVALID_ARCHIVE_ID');
     return join(this.directory, `${kind}-${id}.json`);

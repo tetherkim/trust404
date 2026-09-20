@@ -9,6 +9,7 @@
     "test:integration": "forge build && node --test test/integration/*.test.js",
     "evidence": "node src/v3/cli.js",
     "demo:local": "forge build && node --env-file-if-exists=.env src/demo/local.js",
+    "demo:aim": "forge build && node src/demo/aim.js",
     "check:testnet": "node scripts/check-base-sepolia.js",
     "check:aomi": "node scripts/check-aomi.js",
     "operator": "node src/operator/run.js",

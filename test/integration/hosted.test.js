@@ -54,6 +54,11 @@ test('hosted queue recovers interrupted work before new work and exports only al
  assert.equal((await c.call('/api/jobs/request-0002/files/execution.json')).status,404);
  assert.equal((await c.call('/api/status')).status,200);
  assert.equal(calls,1);const download=await c.call('/api/jobs/request-0002/files/audit.json');assert.equal(download.status,200);assert.deepEqual(await download.json(),{proof:'public'});
+ for(const name of ['evidence.json','verify-config.json']){
+  writeFileSync(join(files,name),'{"public":true}');
+  const file=await c.call(`/api/jobs/request-0002/files/${name}`);
+  assert.equal(file.status,200);assert.deepEqual(await file.json(),{public:true});
+ }
 });
 
 
