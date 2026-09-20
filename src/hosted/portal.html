@@ -5,7 +5,7 @@
 <section id="login-panel"><h2>시연 접속</h2><form id="login-form"><label for="access-code">팀 접속 코드<input id="access-code" type="password" autocomplete="current-password" required></label><button id="login-button">접속</button></form></section>
 <div id="error" role="alert" class="error"></div>
 <div id="workspace" hidden><section><h2>새 판단 요청</h2><p id="server-state" class="state" aria-live="polite">서버 상태 확인 중</p><form id="request-form"><label for="amount">요청 금액 (USDC)<input id="amount" inputmode="decimal" value="150" pattern="[0-9]+(\.[0-9]{1,6})?" required></label><button id="submit" disabled>요청 및 기록 등록</button></form><small>요청당 최대 10,000 USDC · 하루 20건 · 대기 5건. 요청자 서명은 서버의 시연용 키를 사용합니다.</small></section>
-<section><h2>최근 요청 <small>팀 공유 기록</small></h2><div class="table"><table><thead><tr><th>요청 번호</th><th>금액</th><th>처리 상태</th><th>판단 / 감사</th><th>자료</th></tr></thead><tbody id="jobs"></tbody></table></div></section>
+<section><h2>최근 요청 <small>팀 공유 기록</small></h2><div class="table"><table><thead><tr><th>요청 번호</th><th>금액</th><th>처리 상태</th><th>판단 / 등록 기한</th><th>감사 · 저장 시점 기준</th><th>자료</th></tr></thead><tbody id="jobs"></tbody></table></div></section>
 <section><h2>독립 감사</h2><a href="/audit" target="_blank" rel="noopener">감사 파일 가져오기 ↗</a> · <a href="/api/example" download="audit.json">기존 실제 시연 파일</a><p>완료된 요청의 감사 파일을 내려받아 감사 화면에 가져오세요. 감사는 서명과 거래 전송 없이 진행합니다.</p></section></div>
 <footer>Aomi 구성·시뮬레이션 → 운영 지갑 서명 → 체인 등록 → 증거 파일 저장. 지연·누락도 감사 결과에 표시합니다.</footer>
 </main><script src="/portal.js" defer></script></body></html>

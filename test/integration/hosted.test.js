@@ -78,3 +78,15 @@ test('expired portal session restores login and stops polling',async()=>{
  assert.equal(document.getElementById('workspace').hidden,true);
  assert.equal(timers.length,0);
 });
+
+
+test('portal distinguishes saved records from audit success and finality',()=>{
+ const context={document:{getElementById:()=>({addEventListener(){}})},sessionStorage:{getItem:()=>null},fetch:()=>new Promise(()=>{})};
+ runInNewContext(readFileSync(new URL('../../src/hosted/portal.js',import.meta.url),'utf8'),context);
+ const result={auditOk:false,finality:'PROVISIONAL',requestAudit:{decisions:[{record:'VALID',policy:'MATCH'}]}};
+ assert.equal(context.auditSummary(result),'개별 서명·정책 일치 / 전체 감사 이상 있음 / 체인 확정 대기');
+ assert.equal(context.auditSummary(null),'미검증');
+ result.requestAudit.decisions=[{error:'POLICY_MISMATCH'}];result.auditOk=true;result.finality='FINALIZED';
+ assert.equal(context.auditSummary(result),'개별 검증 확인 필요 / 전체 감사 통과 / 체인 확정');
+ assert.equal(context.auditSummary({}),'개별 검증 확인 필요 / 전체 감사 미확인 / 체인 확정 미확인');
+});
