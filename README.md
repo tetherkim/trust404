@@ -216,3 +216,5 @@ sequenceDiagram
 ### Pipeline 422 원인 추가 진단
 
 동일한 호출을 Agent 경로로 실행했을 때 `signing_delegated_custody_scope_required` / `this grant does not permit delegated custody; ... reauthorize with custody:delegate` 오류가 반환됐습니다. CLI 0.7.6은 Pipeline POST에 `pipeline:execute`만 자동 요청하고 `custody:delegate`를 추가하지 않습니다. 위임 지갑 Auto 정책과 CLI OAuth scope는 별도입니다. 새 Build 및 0.001 test ETH 충전 이후에도 동일한 422가 재현돼, 만료나 단순 잔액 부족만으로 설명되지 않습니다. 추가 scope 승인 전까지 hosted 서명 성공으로 표시하지 않습니다. 테스트 권한 요청용 CLI 복사본은 로컬 `.git/aomi-tools` 안에만 준비했으며 설치 원본 및 저장소 코드에는 적용하지 않았습니다.
+
+2026-09-20 추가 확인: Pipeline OAuth에 `custody:delegate`를 포함한 device 승인을 완료했습니다. 승인 후 새로 stage/simulate한 Build도 commit에서 동일한 HTTP 422 / `pipeline_commit_failed`를 반환했습니다. 따라서 누락 scope가 유일한 원인이었다고 단정할 수 없습니다. 추가 backend 진단이 필요하며 Aomi hosted 전송은 여전히 미완료입니다.
