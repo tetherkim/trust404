@@ -34,6 +34,9 @@ async function unusedPort() {
 const artifact = (file, name) => JSON.parse(readFileSync(join(root, 'out', file, `${name}.json`), 'utf8'));
 
 export async function setupLocalBaseline({ port, silent = true } = {}) {
+  // Fail before spawning Anvil if a fresh checkout has not been compiled.
+  const creditStateArtifact = artifact('CreditState.sol', 'CreditState');
+  const anchorArtifact = artifact('RecordAnchor.sol', 'RecordAnchor');
   const rpcPort = port ?? (await unusedPort());
   const rpcUrl = `http://127.0.0.1:${rpcPort}`;
   const child = spawn(
@@ -46,6 +49,16 @@ export async function setupLocalBaseline({ port, silent = true } = {}) {
   child.on('error', err => {
     spawnError = err;
   });
+
+  const teardown = async () => {
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, 'exit');
+      child.kill();
+      await exited;
+    }
+  };
+
+  try {
 
   const rpc = jsonRpc(rpcUrl, { timeoutMs: 3000 });
   let ready = false;
@@ -67,9 +80,6 @@ export async function setupLocalBaseline({ port, silent = true } = {}) {
 
   const wallet = createWalletClient({ account, chain: foundry, transport: http(rpcUrl) });
   const client = createPublicClient({ chain: foundry, transport: http(rpcUrl) });
-
-  const creditStateArtifact = artifact('CreditState.sol', 'CreditState');
-  const anchorArtifact = artifact('RecordAnchor.sol', 'RecordAnchor');
 
   const receipt = async txHash => {
     const tx = await client.waitForTransactionReceipt({ hash: txHash });
@@ -147,14 +157,6 @@ export async function setupLocalBaseline({ port, silent = true } = {}) {
     debt: '0'
   };
 
-  const teardown = async () => {
-    if (child.pid && child.exitCode === null && child.signalCode === null) {
-      const exited = once(child, 'exit');
-      child.kill();
-      await exited;
-    }
-  };
-
   return {
     ...contextData,
     wallet,
@@ -163,6 +165,10 @@ export async function setupLocalBaseline({ port, silent = true } = {}) {
     setCreditState,
     teardown
   };
+  } catch (error) {
+    await teardown();
+    throw error;
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

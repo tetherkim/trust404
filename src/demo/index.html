@@ -1,13 +1,110 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TRUST404 · 출금 판단 검증</title>
 <style>
-:root{font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#192c26;background:#f4f6f5;line-height:1.55}*{box-sizing:border-box}body{margin:0}button{font:inherit;cursor:pointer;color:inherit}button:disabled{cursor:wait;opacity:.55}button:focus-visible,summary:focus-visible{outline:3px solid #6185cc;outline-offset:4px}header{background:#fff;border-bottom:1px solid #e0e6e3}.topbar{max-width:1240px;margin:auto;padding:21px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:800;letter-spacing:-.04em;font-size:21px}.brand span{font-weight:400;color:#60716b;font-size:14px;letter-spacing:0;margin-left:14px}.environment{font-size:12px;color:#596b64;display:flex;gap:8px;flex-wrap:wrap}.environment span{border:1px solid #dce4df;border-radius:20px;padding:4px 10px}main{max-width:1240px;margin:auto;padding:30px 32px 20px}.intro{margin-bottom:26px}h1{font-size:28px;letter-spacing:-.045em;line-height:1.3;margin:0 0 8px}p{margin:0}.muted{color:#64766e;font-size:14px}.workspace{display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px}.section-label{font-size:12px;font-weight:700;color:#71827b;margin:0 0 12px}.scenario-list{display:flex;flex-direction:column;gap:7px}.scenario{display:flex;gap:12px;width:100%;text-align:left;border:1px solid transparent;background:transparent;padding:14px 12px;border-radius:12px}.scenario:hover{background:#e9eeeb}.scenario[aria-pressed=true]{background:#fff;border-color:#b9cfc1;box-shadow:0 2px 7px #233e3010}.number{font-size:12px;color:#7b8d82;padding-top:2px}.scenario strong{display:block;font-size:14px;font-weight:650}.scenario small{display:block;font-size:12px;color:#6d7e73;margin-top:3px}.sidebar-note{font-size:12px;color:#718079;line-height:1.7;margin-top:20px;padding:0 12px}.panel{background:white;border:1px solid #dfe7e2;border-radius:17px;padding:26px}.panel-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}h2{font-size:21px;letter-spacing:-.03em;margin:0 0 6px}.case-index{font-size:12px;white-space:nowrap;color:#6d8074;background:#f2f5f3;padding:5px 10px;border-radius:20px}.request-strip{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:23px 0;border-bottom:1px solid #e6ece8;padding-bottom:21px}.metric-label{font-size:12px;color:#64796d;display:block;margin-bottom:5px}.request-strip strong{font-size:22px;letter-spacing:-.035em}.unit{font-size:12px;font-weight:400;color:#789082;margin-left:5px}.balance-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.balance{padding:19px;border:1px solid #c5d9cd;border-radius:12px;background:#f1f7f3}.balance.current{background:#fafbfa;border-color:#e3e8e5}.balance strong{font-size:35px;line-height:1.2;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.balance-tag{display:inline-block;font-size:10px;font-weight:600;color:#306847;background:#dfeee3;border-radius:4px;padding:2px 6px;margin-left:5px}.current .balance-tag{background:#edf0ee;color:#78867d}.balance-note{font-size:12px;color:#698070;margin-top:8px}.equation{font-size:13px;margin:14px 0 0;padding:12px 14px;background:#f8faf9;border-radius:8px;color:#465d50}.action-row{display:flex;align-items:center;gap:15px;margin-top:22px}#run{border:0;background:#174d36;color:white;font-size:14px;font-weight:650;padding:13px 23px;border-radius:9px;min-height:48px;white-space:nowrap}#run:hover:not(:disabled){background:#103c29}.action-note{font-size:12px;color:#75837c}.result{margin-top:20px;border:1px solid #e0e7e3;border-radius:14px;overflow:hidden}.result-heading{padding:20px 22px;background:#f7f9f8}.result-status{font-size:11px;font-weight:700;color:#718178;margin-bottom:5px}.result h3{font-size:19px;letter-spacing:-.03em;margin:0 0 6px}.result p{font-size:13px;color:#627469}.result.good{border-color:#b6d3bf}.result.good .result-heading{background:#eaf5ed}.result.good .result-status{color:#237040}.result.detected{border-color:#e4cba7}.result.detected .result-heading{background:#fff6e9}.result.detected .result-status{color:#96601c}.result.unknown .result-heading{background:#eef2f7}.result.error .result-heading{background:#fff0ef}.checks{list-style:none;padding:0 22px;margin:0}.check{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-top:1px solid #e9eeeb;font-size:12px}.check:first-child{border-top:0}.check span{color:#6e7d74}.check strong{text-align:right;font-weight:600}.details{margin-top:18px;padding:18px 22px}summary{font-size:13px;font-weight:600;cursor:pointer;color:#5c7064}dl{font-size:12px;margin:18px 0}dt{color:#74847b;margin-top:12px}dd{margin:3px 0;overflow-wrap:anywhere;font-family:ui-monospace,monospace}pre{max-height:330px;overflow:auto;font-size:11px;background:#f4f7f5;padding:14px;border-radius:8px}footer{font-size:11px;color:#7a8980;padding:20px 0 8px;text-align:right}#load-error:empty{display:none}#load-error{background:#fff0ef;color:#913d37;padding:14px;margin-bottom:15px;border-radius:9px;font-size:13px}
-@media(max-width:800px){.topbar{padding:17px 20px}.brand span{display:none}main{padding:24px 20px}.workspace{grid-template-columns:1fr;gap:18px}.scenario-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.scenario{display:block;padding:10px 8px;border-color:#e1e6e3;background:#f9fbfa}.scenario .number,.scenario small,.sidebar-note{display:none}.scenario strong{font-size:12px}.section-label{margin-bottom:8px}.intro{margin-bottom:20px}}
-@media(max-width:480px){.topbar{align-items:flex-start;padding:16px}.environment{justify-content:flex-end;gap:4px;max-width:190px;font-size:10px}.environment span{padding:3px 7px}main{padding:22px 14px}h1{font-size:24px}.intro .muted{font-size:12px}.scenario-list{grid-template-columns:repeat(3,minmax(0,1fr))}.scenario{text-align:center;min-height:43px}.panel{padding:18px}.panel-head{gap:6px}h2{font-size:19px}.case-index{font-size:10px;padding:4px 7px}.request-strip{gap:12px;margin:18px 0;padding-bottom:17px}.request-strip strong{font-size:20px}.balance-grid{gap:8px}.balance{padding:13px 10px}.balance strong{font-size:29px}.balance-tag{display:block;width:fit-content;margin:4px 0 0}.balance-note{font-size:11px}.equation{font-size:12px;padding:11px}.action-row{align-items:stretch;flex-direction:column;gap:8px}.action-note{text-align:center;font-size:11px}.result-heading{padding:17px}.checks{padding:0 17px}.check{gap:12px}.check strong{max-width:62%}.details{padding:16px}footer{text-align:left;font-size:10px}}
-@media(min-width:801px){.topbar{padding-top:16px;padding-bottom:16px}main{padding-top:23px}.intro{margin-bottom:20px}.panel{padding:22px}.request-strip{margin:17px 0;padding-bottom:15px}.balance{padding:15px 17px}.balance-note{margin-top:6px}.equation{margin-top:11px;padding:10px 12px}.action-row{margin-top:17px}.result{margin-top:16px}.result-heading{padding:16px 20px}.checks{padding:0 20px}.check{padding:9px 0}.details{margin-top:14px;padding:15px 20px}}
+:root { color-scheme:dark; font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#f4f2fa; background:#0d0d13; line-height:1.6; --muted:#aaa6ba; --line:#2c2939; --accent:#a995ff; }
+* { box-sizing:border-box; }
+body { margin:0; background:radial-gradient(ellipse at 0 0,#21163888,transparent 55%); min-height:100vh; }
+button { font:inherit; cursor:pointer; color:inherit; }
+button:disabled { cursor:wait; opacity:.55; }
+button:focus-visible,summary:focus-visible,a:focus-visible { outline:2px solid #b9a7ff; outline-offset:4px; }
+header { border-bottom:1px solid var(--line); background:#0e0d16bb; }
+.topbar { max-width:1280px; margin:auto; padding:18px 32px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.brand { font-weight:850; letter-spacing:-.04em; font-size:23px; }
+.brand span { font-weight:450; color:var(--muted); font-size:12px; letter-spacing:.02em; margin-left:16px; }
+.environment { font-family:ui-monospace,monospace; font-size:11px; color:var(--muted); display:flex; gap:8px; flex-wrap:wrap; }
+.environment span { border:1px solid var(--line); padding:5px 10px; }
+main { max-width:1280px; margin:auto; padding:30px 32px 16px; }
+.intro { margin-bottom:25px; }
+.eyebrow { display:flex; align-items:center; gap:16px; color:var(--accent); font:600 10px ui-monospace,monospace; letter-spacing:.16em; margin-bottom:14px; }
+.eyebrow::after { content:""; height:1px; background:var(--line); flex:1; }
+h1 { font-size:38px; letter-spacing:-.05em; line-height:1.25; margin:0 0 10px; font-weight:750; }
+p { margin:0; }
+.muted { color:var(--muted); font-size:13px; }
+.workspace { display:grid; grid-template-columns:215px minmax(0,1fr); gap:28px; }
+.section-label { font-size:11px; font-weight:600; color:var(--muted); margin:0 0 10px; letter-spacing:.07em; }
+.scenario-list { display:flex; flex-direction:column; }
+.scenario { display:flex; gap:13px; width:100%; text-align:left; border:0; border-left:2px solid transparent; border-bottom:1px solid #24222e; background:transparent; padding:16px 12px; }
+.scenario:hover { background:#1b1826; }
+.scenario[aria-pressed=true] { background:#201a33; border-left-color:#987cff; }
+.number { font:12px ui-monospace,monospace; color:#898399; padding-top:4px; }
+.scenario[aria-pressed=true] .number { color:var(--accent); }
+.scenario strong { display:block; font-size:14px; font-weight:600; }
+.scenario small { display:block; font-size:11px; color:var(--muted); margin-top:3px; }
+.sidebar-note { font-size:11px; color:#928ca3; line-height:1.8; margin-top:22px; padding:0 12px; }
+.panel { background:#121119; border:1px solid var(--line); padding:22px; }
+.panel-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+h2 { font-size:20px; letter-spacing:-.03em; margin:0 0 4px; }
+.case-index { font:11px ui-monospace,monospace; white-space:nowrap; color:var(--accent); padding:5px 0; }
+.request-strip { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:17px 0; border-bottom:1px solid var(--line); padding-bottom:14px; }
+.metric-label { font-size:11px; color:var(--muted); display:block; margin-bottom:5px; }
+.request-strip strong { font-size:22px; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+.unit { font-size:11px; font-weight:400; color:#9992ab; margin-left:5px; }
+.balance-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.balance { padding:15px 17px; border:1px solid #615078; background:#211b30; }
+.balance.current { background:#16151e; border-color:var(--line); }
+.balance strong { font-size:36px; line-height:1.2; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+.balance-tag { display:inline-block; font-size:9px; font-weight:600; color:#c7b7ff; background:#39294e; padding:2px 6px; margin-left:7px; }
+.current .balance-tag { background:#2c2936; color:#c0b9cc; }
+.balance-note { font-size:11px; color:#bbb0ce; margin-top:6px; }
+.equation { font-size:12px; margin:12px 0 0; padding:8px 12px; border-left:2px solid #8b68ef; color:#d0c9df; background:#191520; }
+.action-row { display:flex; align-items:center; gap:15px; margin-top:17px; }
+#run { border:1px solid #8d77ff; background:#6851ec; color:#fff; font-size:13px; font-weight:650; padding:12px 24px; min-height:46px; white-space:nowrap; }
+#run:hover:not(:disabled) { background:#7a63ff; }
+.action-note { font-size:11px; color:var(--muted); }
+.result { margin-top:18px; border-top:1px solid var(--line); overflow:hidden; }
+.result-heading { padding:16px 0 12px; }
+.result-status { font:600 10px ui-monospace,monospace; color:var(--accent); margin-bottom:5px; letter-spacing:.07em; }
+.result h3 { font-size:19px; letter-spacing:-.03em; margin:0 0 6px; }
+.result p { font-size:12px; color:#b8b2c7; }
+.result.good .result-status { color:#96ddbb; }
+.result.detected .result-status { color:#ffc48c; }
+.result.error .result-status { color:#ff9d9d; }
+.checks { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:1fr 1fr; column-gap:24px; }
+.check { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-top:1px solid var(--line); font-size:11px; }
+.check span { color:var(--muted); }
+.check strong { text-align:right; font-weight:500; color:#e3dfeb; }
+.details { margin-top:12px; padding:14px 20px; background:transparent; }
+summary { font-size:12px; font-weight:500; cursor:pointer; color:#b9b0ca; }
+dl { font-size:12px; margin:18px 0; } dt { color:var(--muted); margin-top:12px; }
+dd { margin:3px 0; overflow-wrap:anywhere; font-family:ui-monospace,monospace; }
+pre { max-height:330px; overflow:auto; font-size:11px; background:#0d0c13; padding:14px; }
+footer { font-size:10px; color:#9690a5; padding:16px 0 8px; text-align:right; }
+#load-error:empty { display:none; }
+#load-error { border-left:2px solid #ee8989; color:#ffbdbd; padding:14px; margin-bottom:15px; background:#2c1b24; font-size:13px; }
+@media(min-width:1100px) {
+ main { padding-top:24px; } .intro { margin-bottom:22px; } h1 { font-size:34px; }
+ article.panel { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); column-gap:24px; }
+ .panel-head { grid-column:1 / -1; margin-bottom:6px; }
+ .request-strip,.balance-grid,.equation,.action-row { grid-column:1; }
+ .balance { padding:13px; } .balance-tag { margin-left:0; display:block; width:fit-content; margin-top:4px; }
+ .balance-note { font-size:10px; }
+ .action-row { flex-wrap:wrap; gap:8px; }
+ .result { grid-column:2; grid-row:2 / span 4; margin-top:17px; border-top:0; border-left:1px solid var(--line); padding-left:22px; }
+ .result-heading { padding-top:0; } .result h3 { font-size:23px; line-height:1.4; margin:12px 0; }
+ .result p { line-height:1.9; } .checks { grid-template-columns:1fr; margin-top:14px; }
+}
+@media(max-width:800px) {
+ .topbar { padding:17px 20px; } .brand span { display:none; } main { padding:24px 20px; }
+ .workspace { grid-template-columns:1fr; gap:18px; } .scenario-list { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; }
+ .scenario { display:block; padding:10px 8px; border:1px solid var(--line); } .scenario[aria-pressed=true] { border-color:#987cff; }
+ .scenario .number,.scenario small,.sidebar-note { display:none; } .scenario strong { font-size:12px; } .section-label { margin-bottom:8px; }
+ h1 { font-size:32px; }
+}
+@media(max-width:480px) {
+ .topbar { align-items:flex-start; padding:16px; } .environment { justify-content:flex-end; gap:4px; max-width:190px; font-size:9px; }
+ .environment span { padding:3px 6px; } main { padding:22px 14px; } h1 { font-size:28px; }
+ .intro .muted { font-size:12px; } .eyebrow { font-size:9px; letter-spacing:.09em; }
+ .scenario-list { grid-template-columns:repeat(3,minmax(0,1fr)); } .scenario { text-align:center; min-height:43px; }
+ .panel { padding:17px; } .panel-head { gap:6px; } h2 { font-size:19px; } .case-index { font-size:10px; }
+ .request-strip { gap:12px; margin:17px 0; } .balance-grid { gap:8px; } .balance { padding:13px 10px; }
+ .balance strong { font-size:30px; } .balance-tag { display:block; width:fit-content; margin:4px 0 0; }
+ .balance-note { font-size:10px; } .equation { font-size:11px; padding:10px; }
+ .action-row { align-items:stretch; flex-direction:column; gap:8px; } .action-note { text-align:center; font-size:10px; }
+ .checks { grid-template-columns:1fr; } .check strong { max-width:62%; } .details { padding:14px; } footer { text-align:left; }
+}
 </style></head><body>
 <header><div class="topbar"><div class="brand">TRUST404<span>출금 판단 검증</span></div><div class="environment" aria-label="실행 환경"><span id="environment">환경 확인 중</span><span id="aomi">Aomi 상태 확인 중</span></div></div></header>
-<main><div class="intro"><h1>그때의 판단, 지금 다시 확인하기</h1><p class="muted">출금이 거절된 이유와 기록이 바뀌거나 빠졌는지를 직접 검증합니다.</p></div><div id="load-error" role="alert"></div>
+<main><div class="intro"><div class="eyebrow">03 / VERIFIABLE OFF-CHAIN DECISIONS</div><h1>그때의 판단, 지금 다시 확인하기</h1><p class="muted">출금이 거절된 이유와 기록이 바뀌거나 빠졌는지를 직접 검증합니다.</p></div><div id="load-error" role="alert"></div>
 <div class="workspace"><aside><p class="section-label">검증할 사례</p><nav id="scenarios" class="scenario-list" aria-label="시연 사례"></nav><p class="sidebar-note">사례를 선택하고 검증 버튼을 누르세요.<br>각 사례의 기록을 실제로 다시 읽습니다.</p></aside><div>
 <article class="panel"><div class="panel-head"><div><h2 id="title">시연 준비 중</h2><p id="description" class="muted">로컬 서버에서 사례를 불러오고 있습니다.</p></div><span class="case-index" id="case-index">— / —</span></div>
 <div class="request-strip"><div><span class="metric-label">출금 요청 금액</span><strong id="amount">—</strong><span class="unit">토큰</span></div><div><span class="metric-label">유지해야 할 최소 잔액</span><strong id="minimum">—</strong><span class="unit">토큰</span></div></div>
