@@ -212,3 +212,7 @@ sequenceDiagram
 ### Aomi 위임 적용 후 검증
 
 2026-09-20 Portal에서 Privy EVM 지갑 `0xb88122f378189b3dac4efea164181e2191489726`의 Auto 정책을 적용했고, 위임 유효일 2026-09-27을 확인했습니다. Base Sepolia의 기존 계약 `publisher()` 호출로 Pipeline stage와 simulate는 통과했지만 CLI commit은 HTTP 422로 거부됐습니다. receipt는 확인되지 않았으며 hosted 자동 전송 성공을 주장하지 않습니다. 해당 Privy 지갑의 test ETH 잔액은 0입니다. 이 사실만으로 422 원인이 잔액이라고 단정할 수 없습니다. 기존 직접 RPC worker와 Aomi hosted 실행은 아직 분리되어 있습니다.
+
+### Pipeline 422 원인 추가 진단
+
+동일한 호출을 Agent 경로로 실행했을 때 `signing_delegated_custody_scope_required` / `this grant does not permit delegated custody; ... reauthorize with custody:delegate` 오류가 반환됐습니다. CLI 0.7.6은 Pipeline POST에 `pipeline:execute`만 자동 요청하고 `custody:delegate`를 추가하지 않습니다. 위임 지갑 Auto 정책과 CLI OAuth scope는 별도입니다. 새 Build 및 0.001 test ETH 충전 이후에도 동일한 422가 재현돼, 만료나 단순 잔액 부족만으로 설명되지 않습니다. 추가 scope 승인 전까지 hosted 서명 성공으로 표시하지 않습니다. 테스트 권한 요청용 CLI 복사본은 로컬 `.git/aomi-tools` 안에만 준비했으며 설치 원본 및 저장소 코드에는 적용하지 않았습니다.
