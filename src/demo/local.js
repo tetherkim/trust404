@@ -16,6 +16,7 @@ import { auditAll } from '../v3/verify.js';
 import { canonical, hash, sign, check } from '../v3/crypto.js';
 import { requestRecord, scope } from '../v3/policy.js';
 import { buildTree } from '../v3/merkle.js';
+import { auditFile, readUpload } from './audit-file.js';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const cases = [
@@ -38,7 +39,7 @@ const artifact = (file, name) => JSON.parse(readFileSync(join(root, 'out', file,
 
 // This harness always spawns its own loopback chain. It never accepts an external
 // RPC or a real signing key; the public Anvil account is usable only here.
-export async function startDemo({ port = 4040, directory = join(root, '.local-demo') } = {}) {
+export async function startDemo({ port = 4040, directory = join(root, '.local-demo'), profileFile = process.env.AUDIT_PROFILES_FILE } = {}) {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const runDirectory = mkdtempSync(join(directory, 'run-'));
   const rpcPort = await unusedPort(), rpcUrl = `http://127.0.0.1:${rpcPort}`;
@@ -135,6 +136,15 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
           receiptBalance: '120', currentBalance: '200', amount: '50', minimumBalance: '100', asOf } });
       } finally { await closeServer(api); store.close(); }
     }
+    const profiles = new Map([...records.values()].map(record => [record.trust.policyHash,
+      { trust: record.trust, rpcUrl, asOf: record.asOf.blockHash, label: `LOCAL / ${record.info.title}` }]));
+    if (profileFile) {
+      for (const config of JSON.parse(readFileSync(profileFile, 'utf8'))) {
+        const trust = JSON.parse(readFileSync(resolve(root, config.trustFile), 'utf8'));
+        check(!profiles.has(trust.policyHash), 'DUPLICATE_TRUST_PROFILE');
+        profiles.set(trust.policyHash, { trust, rpcUrl: config.rpcUrl, label: config.label ?? trust.policy.logId });
+      }
+    }
     const index = readFileSync(new URL('./index.html', import.meta.url));
     const js = readFileSync(new URL('./ui.js', import.meta.url));
     server = httpServer(async (req, res) => {
@@ -144,13 +154,34 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
         // Loopback binding plus Host/Origin checks keep this development surface local.
         check(req.headers.host === `127.0.0.1:${server.address().port}`, 'LOCAL_HOST_REQUIRED');
         check(!req.headers.origin || req.headers.origin === `http://${req.headers.host}`, 'LOCAL_ORIGIN_REQUIRED');
-        if (req.method !== 'GET') { res.writeHead(405, headers).end(); return; }
         const path = new URL(req.url, 'http://localhost').pathname;
+        if (req.method === 'POST' && path === '/api/audit-file') {
+          check(req.headers['content-type']?.split(';')[0] === 'application/json', 'JSON_REQUIRED');
+          const result = await auditFile(await readUpload(req), profiles);
+          res.writeHead(200, { ...headers, 'content-type': 'application/json' }).end(canonical(result)); return;
+        }
+        if (req.method !== 'GET') { res.writeHead(405, headers).end(); return; }
         if (path === '/' || path === '/ui.js') {
           res.writeHead(200, { ...headers, 'content-type': path === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8' }).end(path === '/' ? index : js); return;
         }
         let result;
-        if (path === '/api/status') result = { environment: 'local-anvil', chainId: 31337, aomiConnected: false,
+        if (path === '/api/profiles') result = [...profiles].map(([id, p]) => ({ id, label: p.label, chainId: p.trust.policy.chainId, anchorAddress: p.trust.policy.anchorAddress, cutoff: p.asOf ?? 'finalized' }));
+        else if (path.startsWith('/api/sample/')) {
+          const record = records.get(path.slice('/api/sample/'.length));
+          check(record, 'UNKNOWN_SAMPLE');
+          const batches = {}, blobs = {};
+          for (const id of record.info.decisionTransaction ? ['1', '2'] : ['1']) {
+            let batch; try { batch = record.auditArchive.batch(id); } catch { continue; }
+            batches[id] = batch;
+            for (const item of batch) if (item.decision?.payload.stateHash) {
+              const hash = item.decision.payload.stateHash;
+              try { blobs[hash] = record.auditArchive.blob(hash); } catch {}
+            }
+          }
+          result = { format: 'trust404-audit-v1', profileId: record.trust.policyHash, batches, blobs };
+          res.writeHead(200, { ...headers, 'content-type': 'application/json', 'content-disposition': `attachment; filename="audit-${record.info.id}.json"` }).end(canonical(result)); return;
+        }
+        else if (path === '/api/status') result = { environment: 'local-anvil', chainId: 31337, aomiConnected: false,
           scenarios: [...records.values()].map(r => r.info) };
         else {
           const id = path.match(/^\/api\/audit\/([a-z]+)$/)?.[1], record = records.get(id);

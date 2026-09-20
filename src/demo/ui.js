@@ -1,92 +1,67 @@
 const $ = id => document.getElementById(id);
-const names = { rejection: 'Valid rejection', tamper: 'Record tampering', unavailable: 'Archive unavailable', missing: 'Missing decision', wrong: 'Policy mismatch' };
-let scenarios = [], selected, busy = false;
-const results = new Map();
-const short = value => value ? `${value.slice(0, 10)}…${value.slice(-6)}` : '—';
-function summary(scenario) {
-  const entry = results.get(scenario.id);
-  if (!entry || entry.running || entry.error) return { verdict: entry?.running ? 'RUNNING' : entry?.error ? 'ERROR' : 'NOT_RUN', tone: entry?.error ? 'fail' : 'muted', archive: '—', policy: '—', timing: '—', finding: entry?.error ?? '—' };
-  const r = entry.data, request = r.requests?.find(item => item.requestId === scenario.requestId);
-  const codes = (r.issues ?? []).map(issue => issue.code);
-  const match = request?.decisions?.find(decision => decision.policy === 'MATCH');
-  const missing = request?.timing === 'MISSING_AS_OF_H';
-  const uncertain = codes.includes('DATA_UNAVAILABLE');
-  const finding = codes.length > 0 || missing;
-  return { verdict: uncertain ? 'INCONCLUSIVE' : finding ? 'FINDING' : r.ok && match ? 'VERIFIED' : 'INCONCLUSIVE',
-    tone: uncertain ? 'unknown' : finding ? 'warn' : r.ok && match ? 'pass' : 'unknown',
-    archive: r.complete ? 'COMPLETE' : 'INCOMPLETE',
-    policy: codes.includes('POLICY_MISMATCH') ? 'MISMATCH' : match ? 'MATCH' : 'NOT_EVALUATED',
-    timing: request?.timing ?? 'UNKNOWN', finding: codes.join(' · ') || (missing ? 'MISSING_AS_OF_H' : match?.outcome ?? '—'), request };
+let input, profiles = [], busy = false, generation = 0;
+function reset() {
+  for (const id of ['requests', 'issues', 'references']) $(id).replaceChildren();
+  for (const id of ['count-requests', 'count-batches', 'count-issues', 'coverage', 'duration', 'finality']) $(id).textContent = '—';
+  $('verdict').textContent = 'NOT_RUN'; $('verdict').className = ''; $('raw').textContent = 'NOT_RUN';
 }
-function cell(row, value, className = '') { const el = document.createElement('td'); el.textContent = value; el.className = className; row.append(el); return el; }
-function render() {
-  $('run').disabled = $('run-all').disabled = busy || !selected;
-  $('suite-state').textContent = busy ? 'RUNNING' : 'READY';
-  const values = scenarios.map(summary);
-  $('count-done').textContent = `${[...results.values()].filter(r => !r.running).length} / ${scenarios.length}`;
-  $('count-pass').textContent = values.filter(r => r.verdict === 'VERIFIED').length;
-  $('count-findings').textContent = values.filter(r => r.verdict === 'FINDING').length;
-  $('count-unknown').textContent = values.filter(r => ['INCONCLUSIVE', 'ERROR'].includes(r.verdict)).length;
-  $('cases').replaceChildren();
-  scenarios.forEach((scenario, index) => {
-    const state = summary(scenario), row = document.createElement('tr');
-    row.className = selected?.id === scenario.id ? 'selected' : '';
-    const first = cell(row, ''), button = document.createElement('button'), number = document.createElement('small');
-    button.className = 'case-button'; button.setAttribute('aria-pressed', String(selected?.id === scenario.id));
-    number.textContent = String(index + 1).padStart(2, '0'); button.append(number, names[scenario.id] ?? scenario.title);
-    button.addEventListener('click', () => { selected = scenario; render(); }); first.append(button);
-    cell(row, short(scenario.requestId), 'code muted').title = scenario.requestId;
-    cell(row, `${scenario.requestAnchor.blockNumber} → ${scenario.asOf.blockNumber}`, 'code');
-    cell(row, state.archive, 'badge'); cell(row, state.policy, `badge ${state.policy === 'MISMATCH' ? 'warn' : state.policy === 'MATCH' ? 'pass' : ''}`);
-    cell(row, state.timing, 'badge'); cell(row, state.finding === '—' ? state.verdict : state.finding, `badge ${state.tone}`);
-    $('cases').append(row);
-  });
-  if (!selected) return;
-  const s = selected, state = summary(s), entry = results.get(s.id);
-  $('selected-title').textContent = `02 / ${names[s.id].toUpperCase()}`;
-  $('case-index').textContent = `${scenarios.indexOf(s) + 1} / ${scenarios.length}`;
-  for (const [id, value] of Object.entries({ historical: s.receiptBalance, current: s.currentBalance, amount: s.amount, minimum: s.minimumBalance,
-    'after-n': BigInt(s.receiptBalance) - BigInt(s.amount), 'after-current': BigInt(s.currentBalance) - BigInt(s.amount),
-    policy: s.policyId, window: `${s.decisionWindowSeconds}s`, 'receipt-block': s.requestAnchor.blockNumber, cutoff: s.asOf.blockNumber,
-    batches: `${s.requestAnchor.batchId} → ${s.decisionAnchor?.batchId ?? 'NONE'}`,
-    deadline: new Date((Number(s.requestAnchor.anchoredAt) + s.decisionWindowSeconds) * 1000).toISOString(),
-    duration: entry?.ms == null ? '—' : `${entry.ms} ms`, finality: `FINALITY ${entry?.data?.finality ?? '—'}` })) $(id).textContent = String(value);
-  $('result-title').textContent = state.verdict; $('result-title').className = state.tone;
-  $('result').setAttribute('aria-busy', String(entry?.running ?? false));
-  $('checks').replaceChildren();
-  for (const [label, value] of [['Archive coverage', state.archive], ['Policy replay', state.policy], ['Registration', state.timing], ['Finding / outcome', state.finding]]) {
-    const li = document.createElement('li'), span = document.createElement('span'), strong = document.createElement('strong');
-    span.textContent = label; strong.textContent = value; li.append(span, strong); $('checks').append(li);
-  }
-  $('records').replaceChildren();
-  for (const [label, value] of [['REQUEST ID', s.requestId], ['POLICY HASH', s.policyHash], ['ANCHOR', s.anchorAddress], ['TOKEN', s.token], ['TREASURY', s.treasury], ['BLOCK N HASH', s.requestAnchor.blockHash], ['BLOCK H HASH', s.asOf.blockHash], ['REQUEST ROOT', s.requestAnchor.root], ['DECISION ROOT', s.decisionAnchor?.root], ['REQUEST TX', s.requestTransaction], ['DECISION TX', s.decisionTransaction]]) {
-    const row = document.createElement('tr'), th = document.createElement('th'); th.scope = 'row'; th.textContent = label; row.append(th); cell(row, value ?? 'NONE', value ? '' : 'empty'); $('records').append(row);
-  }
-  $('raw').textContent = JSON.stringify(entry?.data ?? { status: state.verdict, ...(entry?.error ? { error: entry.error } : {}) }, null, 2);
+function ready() {
+  const profile = profiles.find(p => p.id === $('profile').value);
+  $('run').disabled = busy || !input || profile?.id !== input.profileId;
+  $('profile-info').textContent = profile ? `CHAIN ${profile.chainId} / ${profile.anchorAddress}` : '—';
 }
-async function run(list) {
-  if (busy) return; busy = true;
+$('file').addEventListener('change', async () => {
+  const token = ++generation; input = null; reset(); ready(); $('load-error').textContent = '';
+  const file = $('file').files[0]; if (!file) return;
+  $('file-info').textContent = `${file.name} / ${file.size.toLocaleString()} bytes`;
   try {
-    for (const scenario of list) {
-      results.set(scenario.id, { running: true }); render(); const started = performance.now();
-      try {
-        const response = await fetch(`/api/audit/${encodeURIComponent(scenario.id)}`, { signal: AbortSignal.timeout(30000) });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? `HTTP_${response.status}`);
-        results.set(scenario.id, { data, ms: Math.round(performance.now() - started) });
-      } catch (error) { results.set(scenario.id, { error: error.message, ms: Math.round(performance.now() - started) }); }
-      render();
-    }
-  } finally { busy = false; render(); }
+    if (file.size > 2 * 1024 * 1024) throw new Error('FILE_TOO_LARGE');
+    const data = JSON.parse(await file.text()); if (token !== generation) return;
+    if (data?.format !== 'trust404-audit-v1') throw new Error('INVALID_FILE_FORMAT');
+    input = data;
+    if (!profiles.some(p => p.id === data.profileId)) throw new Error('UNKNOWN_TRUST_PROFILE: configure the trusted deployment on the server.');
+    $('load-error').textContent = data.profileId === $('profile').value ? '' : 'PROFILE_MISMATCH: select the matching trusted deployment.';
+  } catch (error) { if (token === generation) { input = null; $('load-error').textContent = error.message; } }
+  ready();
+});
+$('profile').addEventListener('change', () => { generation++; reset(); $('load-error').textContent = input && input.profileId !== $('profile').value ? 'PROFILE_MISMATCH' : ''; ready(); });
+function row(parent, values, header = false) {
+  const tr = document.createElement('tr');
+  values.forEach((value, i) => { const td = document.createElement(header && i === 0 ? 'th' : 'td'); td.textContent = String(value ?? '—'); tr.append(td); });
+  parent.append(tr);
 }
-$('run').addEventListener('click', () => selected && run([selected]));
-$('run-all').addEventListener('click', () => run([...scenarios]));
-fetch('/api/status').then(async response => {
-  if (!response.ok) throw new Error('STATUS_FAILED');
-  const status = await response.json();
-  if (!status.scenarios?.length) throw new Error('NO_SCENARIOS');
-  scenarios = status.scenarios; selected = scenarios[0];
-  $('environment').textContent = `${status.environment.toUpperCase()} / ${status.chainId}`;
-  $('aomi').textContent = 'AUDIT RUNTIME / LOCAL RPC';
-  render();
-}).catch(error => { $('load-error').textContent = error.message; $('suite-state').textContent = 'OFFLINE'; });
+$('run').addEventListener('click', async () => {
+  if (busy || !input || input.profileId !== $('profile').value) return;
+  busy = true; const token = ++generation; reset(); ready();
+  $('file').disabled = $('profile').disabled = true; $('verdict').textContent = 'RUNNING'; $('load-error').textContent = '';
+  const started = performance.now();
+  try {
+    const response = await fetch('/api/audit-file', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(120000) });
+    const result = await response.json(); if (token !== generation) return;
+    if (!response.ok) throw new Error(result.error ?? `HTTP_${response.status}`);
+    const missing = result.requests.filter(r => ['MISSING_AS_OF_H', 'REGISTERED_LATE'].includes(r.timing));
+    const unavailable = result.issues.some(i => ['DATA_UNAVAILABLE', 'RPC_UNAVAILABLE', 'STATE_UNAVAILABLE'].includes(i.code));
+    $('verdict').textContent = result.ok ? 'VERIFIED' : unavailable ? 'INCONCLUSIVE' : 'FINDING';
+    $('verdict').className = result.ok ? 'pass' : unavailable ? 'unknown' : 'warn';
+    $('count-requests').textContent = result.requests.length; $('count-batches').textContent = result.batchCount;
+    $('count-issues').textContent = result.issues.length + missing.length;
+    $('coverage').textContent = result.complete ? 'COMPLETE' : 'INCOMPLETE';
+    $('finality').textContent = result.finality; $('raw').textContent = JSON.stringify(result, null, 2);
+    for (const request of result.requests) {
+      row($('requests'), [request.requestId, request.timing, request.decisions.map(d => d.error ? 'NOT_VERIFIED' : `${d.record} / ${d.policy}`).join(' · ') || '—', request.decisions.map(d => d.error ?? `${d.outcome} / ${d.reason}`).join(' · ') || (result.complete ? 'NO DECISION' : 'UNKNOWN')]);
+    }
+    for (const issue of [...result.issues, ...missing.map(r => ({ code: r.timing, requestId: r.requestId }))]) {
+      const li = document.createElement('li'); li.textContent = `${issue.code} / ${issue.requestId ?? `batch ${issue.batchId ?? '—'}`}`; $('issues').append(li);
+    }
+    for (const pair of [['PROFILE / POLICY HASH', result.profileId], ['CHAIN', result.chainId], ['ANCHOR', result.anchorAddress], ['CUTOFF BLOCK', result.asOf.blockNumber], ['CUTOFF HASH', result.asOf.blockHash]]) row($('references'), pair, true);
+  } catch (error) { $('verdict').textContent = 'ERROR'; $('verdict').className = 'fail'; $('load-error').textContent = error.message; }
+  finally { busy = false; $('duration').textContent = `${Math.round(performance.now() - started)} ms`; $('file').disabled = $('profile').disabled = false; ready(); }
+});
+fetch('/api/profiles').then(async response => {
+  if (!response.ok) throw new Error('PROFILES_UNAVAILABLE'); profiles = await response.json();
+  for (const profile of profiles) { const option = document.createElement('option'); option.value = profile.id; option.textContent = `${profile.label} / ${profile.id.slice(0, 10)}`; $('profile').append(option); }
+  for (const [id, name] of Object.entries({ rejection: 'Valid', tamper: 'Tampered', unavailable: 'Unavailable', missing: 'Missing', wrong: 'Wrong decision' })) {
+    const link = document.createElement('a'); link.href = `/api/sample/${id}`; link.textContent = name; link.download = `audit-${id}.json`; link.style.color = '#b49aff'; link.style.marginRight = '18px'; $('samples').append(link);
+  }
+  ready();
+}).catch(error => { $('load-error').textContent = error.message; });

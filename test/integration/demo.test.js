@@ -29,6 +29,28 @@ test('local demo creates real records and independently detects all five scenari
   assert.equal(results.missing.complete, true);
   assert.equal(results.missing.requests[0].timing, 'MISSING_AS_OF_H');
   assert(results.wrong.issues.some(i => i.code === 'POLICY_MISMATCH'));
+  const profiles = await (await fetch(`${demo.url}/api/profiles`)).json();
+  assert.equal(profiles.length, 5);
+  const upload = file => fetch(`${demo.url}/api/audit-file`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(file) });
+  for (const scenario of status.scenarios) {
+    const file = await (await fetch(`${demo.url}/api/sample/${scenario.id}`)).json();
+    const response = await upload(file); assert.equal(response.status, 200);
+    const audited = await response.json();
+    assert.deepEqual(audited.requests, results[scenario.id].requests);
+    assert.deepEqual(audited.issues, results[scenario.id].issues);
+    assert.equal(audited.complete, results[scenario.id].complete);
+  }
+  const file = await (await fetch(`${demo.url}/api/sample/rejection`)).json();
+  const changed = structuredClone(file); changed.batches['2'][0].decision.payload.outcome = 'APPROVED';
+  assert((await (await upload(changed)).json()).issues.some(i => i.code === 'TAMPERED_EXPORT'));
+  const deleted = structuredClone(file); delete deleted.batches['2'];
+  const deletionResult = await (await upload(deleted)).json();
+  assert.equal(deletionResult.complete, false); assert.equal(deletionResult.requests[0].timing, 'UNKNOWN');
+  const injected = { ...file, rpcUrl: 'http://untrusted.invalid', asOf: '0x0', trust: {} };
+  assert.equal((await (await upload(injected)).json()).ok, true);
+  assert.equal((await (await upload({ ...file, profileId: 'untrusted' })).json()).error, 'UNKNOWN_TRUST_PROFILE');
+  const oversize = await fetch(`${demo.url}/api/audit-file`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: ' '.repeat(2 * 1024 * 1024 + 1) });
+  assert.equal((await oversize.json()).error, 'FILE_TOO_LARGE');
   assert.equal((await fetch(`${demo.url}/api/status`, { headers: { Origin: 'https://example.com' } })).status, 403);
   const foreignHostStatus = await new Promise((resolve, reject) => {
     get(`${demo.url}/api/status`, { headers: { Host: 'evil.example' } }, response => {
