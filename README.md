@@ -14,8 +14,8 @@
 1. `contracts/`에서 로컬 ABI·바이트코드를 만듭니다.
 
 ```sh
-forge build --offline
-forge test --offline
+forge build --offline --no-lint --quiet
+forge test --offline --quiet
 ```
 
 2. `anvil`로 로컬 테스트넷을 생성합니다.
@@ -39,25 +39,25 @@ RPC_URL=http://127.0.0.1:8545 npm run demo
 
 ```sh
 # 요청의 접수 증거 검증
-node src/cli.js receipt demo-output/customer/receipt.json demo-output/customer/receipt-trust.json
+node src/cli.js receipt demo-output/customer/receipt.json demo-output/customer/receipt-verification-context.json
 # 거절 판단 검증
-node src/cli.js verify demo-output/customer/rejection.json demo-output/auditor/trust.json
+node src/cli.js verify demo-output/customer/rejection.json demo-output/customer/rejection-verification-context.json
 # 승인 판단 검증
-node src/cli.js verify demo-output/customer/approval.json demo-output/auditor/trust.json
+node src/cli.js verify demo-output/customer/approval.json demo-output/customer/approval-verification-context.json
 # 감사 범위의 전체 기록 검증
-node src/cli.js audit demo-output/witness/log.json demo-output/auditor/trust.json
+node src/cli.js audit demo-output/auditor/submission.json demo-output/auditor/verification-context.json
 
 # 다음 공격 파일은 오류 또는 미처리 탐지로 종료 코드 1 기대
 # 판단 사유 변조 탐지
-node src/cli.js verify demo-output/attacks/tampered.json demo-output/auditor/trust.json
+node src/cli.js verify demo-output/attacks/tampered.json demo-output/customer/rejection-verification-context.json
 # 서명 변조 탐지
-node src/cli.js verify demo-output/attacks/forged-signature.json demo-output/auditor/trust.json
+node src/cli.js verify demo-output/attacks/forged-signature.json demo-output/customer/rejection-verification-context.json
 # 기록 삭제 탐지
-node src/cli.js audit demo-output/attacks/deleted-log.json demo-output/auditor/trust.json
+node src/cli.js audit demo-output/attacks/deleted-log.json demo-output/auditor/verification-context.json
 # 판단 기한이 지난 미처리 요청 탐지
-node src/cli.js audit demo-output/attacks/missing-log.json demo-output/attacks/missing-trust.json
+node src/cli.js audit demo-output/attacks/missing-log.json demo-output/attacks/missing-verification-context.json
 # 정책에 어긋난 승인 판단 탐지
-node src/cli.js verify demo-output/attacks/wrong-policy-result.json demo-output/attacks/wrong-policy-trust.json
+node src/cli.js verify demo-output/attacks/wrong-policy-result.json demo-output/attacks/wrong-policy-verification-context.json
 ```
 
 데모는 정상 3개와 공격 5개를 자동 검사합니다. 정상·미처리·정책 위반 사례는 같은 계약에서 각각 확보한 감사 범위를 사용합니다.
@@ -82,21 +82,24 @@ JS 스크립트를 직접 실행할 수도 있습니다.
 node scripts/test-anvil.js
 ```
 
-승인·거절, 기한 경계, 변조·누락, 실패 후 복구, Anvil 종료 후 CLI 검증을 검사합니다. 성공 시 종료 코드는 0, 빌드나 테스트 실패 시 0이 아닌 값을 반환하며 임시 테스트 파일은 정리합니다.
+비기관 등록 거부, 기관 접수·판단, 별도 provider를 통한 체크포인트 조회, 기한 경계와 과거 감사 범위 보존을 실제 계약에서 검사합니다. 성공 시 종료 코드는 0, 빌드나 테스트 실패 시 0이 아닌 값을 반환하며 임시 테스트 파일은 정리합니다.
 
 ### 주요 출력 파일
 
 | 경로 | 내용 |
 | --- | --- |
-| `context.json` | 체인 ID, `evidenceLogAddress`, 배포 블록, 깊이, 고객·기관 주소 |
-| `customer/receipt.json`, `customer/receipt-trust.json` | 판단 전 접수 증거와 그 범위의 신뢰 기준 |
-| `customer/rejection.json`, `customer/approval.json` | 정상 시연 범위의 요청·판단 증거 |
-| `witness/log.json` | 계약 기록과 보관 원문의 **로컬 사본**, view entry 배열 |
-| `auditor/trust.json` | 정상 시연의 감사 범위, 정책, 고객·기관 공개키와 주소 |
+| `context.json`, `auditor/context.json` | 체인 ID, `evidenceLogAddress`, 배포 블록, 깊이, 기관 주소 |
+| `customer/receipt.json`, `customer/receipt-verification-context.json` | 판단 전 접수 증거와 그 범위의 검증 입력 |
+| `customer/rejection.json`, `customer/rejection-verification-context.json` | 기관이 반환한 거절 판단 증거와 해당 체크포인트의 검증 입력 |
+| `customer/approval.json`, `customer/approval-verification-context.json` | 기관이 반환한 승인 판단 증거와 해당 체크포인트의 검증 입력 |
+| `institution/full-log.json` | 기관이 보관하는 전체 요청·판단 기록 |
 | `institution/decisions.json` | 기관이 보관하는 판단 목록 |
+| `auditor/submission.json` | 지정 체크포인트 범위로 기관이 제출한 로그 사본 |
+| `auditor/verification-context.json` | 체인·계약 정보, 별도 provider로 확보한 감사 체크포인트, 정책과 고객·기관 공개키 |
+| `witness/checkpoint.json` | 외부 기록 주체에서 독립 조회한 감사 체크포인트 |
 | `attacks/tampered.json`, `attacks/forged-signature.json`, `attacks/deleted-log.json` | 사유 변경, 서명 위조, 감사 목록 삭제 사례 |
-| `attacks/missing-log.json`, `attacks/missing-trust.json` | 접수 후 판단 미처리를 확인하는 전체 기록과 기한 경과 시점의 신뢰 기준 |
-| `attacks/wrong-policy-result.json`, `attacks/wrong-policy-trust.json` | 정책 위반 판단의 증거와 그 판단을 포함하는 감사 범위의 신뢰 기준 |
+| `attacks/missing-log.json`, `attacks/missing-verification-context.json` | 접수 후 판단 미처리를 확인하는 전체 기록과 기한 경과 시점의 검증 입력 |
+| `attacks/wrong-policy-result.json`, `attacks/wrong-policy-verification-context.json` | 정책 위반 판단의 증거와 그 판단을 포함하는 감사 범위의 검증 입력 |
 
 등록 전 보관하는 요청·판단 원문 파일도 함께 생성합니다. 원문 바이트는 hex, EVM `bigint`는 10진 문자열로 저장합니다. 개인키는 파일에 저장하지 않습니다.
 
@@ -105,15 +108,17 @@ node scripts/test-anvil.js
 ```mermaid
 sequenceDiagram
     participant C as 고객
-    participant W as 외부 기록 주체
     participant I as 기관
+    participant W as 외부 기록 주체
     participant A as 감사자
     C->>C: 요청 서명·원문 바이트 보관
-    C->>W: 고객 지갑으로 원문 해시 등록
-    W-->>C: 등록 이벤트·체크포인트
+    C->>I: 서명한 요청 원문 전달
+    I->>I: 서명·스키마·정책·금액 검증 및 원문 보관
+    I->>W: 기관 지갑으로 요청 원문 해시 등록
+    W-->>I: 요청 등록 이벤트·체크포인트
+    I->>I: 전체 기록으로 접수 증거 생성
+    I-->>C: 접수 증거 전달
     C->>C: 접수 증거와 판단 기한 보관
-    C->>I: 원문과 등록 식별 정보 직접 전달
-    I->>W: 지정 체인·계약의 요청 등록 확인
     I->>I: 공개된 한도 규칙 실행
     I->>W: 기관 지갑으로 서명 판단의 해시 등록
     W-->>I: 판단 등록 이벤트·체크포인트
