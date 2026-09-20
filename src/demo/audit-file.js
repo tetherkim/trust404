@@ -1,7 +1,8 @@
-import { auditView } from '../v3/finality.js';
-import { check, canonical } from '../v3/crypto.js';
-import { auditAll } from '../v3/verify.js';
-import { ChainReader, jsonRpc } from '../v3/chain.js';
+import { auditView } from '../verifier/finality.js';
+import { check, canonical } from '../common/crypto.js';
+import { auditAll } from '../verifier/verify.js';
+import { ChainReader } from '../chain/reader.js';
+import { jsonRpc } from '../common/rpc.js';
 
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 export async function readUpload(req) {

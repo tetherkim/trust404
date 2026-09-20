@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { setupLocalBaseline } from '../../scripts/deploy-local.js';
-import { RpcRuntimeAdapter } from '../../src/v3/rpc-runtime.js';
-import { Archive, EvidenceStore } from '../../src/v3/store.js';
-import { ChainReader, anchorCall } from '../../src/v3/chain.js';
-import { hash, canonical, sign } from '../../src/v3/crypto.js';
-import { scope, requestRecord, receiptRef } from '../../src/v3/policy.js';
-import { verifyOne } from '../../src/v3/verify.js';
+import { RpcRuntimeAdapter } from '../../src/chain/rpc-runtime.js';
+import { Archive, EvidenceStore } from '../../src/storage/store.js';
+import { ChainReader, anchorCall } from '../../src/chain/reader.js';
+import { hash, canonical, sign } from '../../src/common/crypto.js';
+import { scope, requestRecord, receiptRef } from '../../src/policy/policy.js';
+import { verifyOne } from '../../src/verifier/verify.js';
 
 test('[TASK-06~09] 상태 변경 시연 및 2계층 검증: 담보/부채 변동에 따른 거절 사유 변화 및 Replay 검증', async () => {
   const env = await setupLocalBaseline();

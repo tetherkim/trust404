@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { hash, canonical } from '../../src/v3/crypto.js';
+import { hash, canonical } from '../../src/common/crypto.js';
 import {
   scope,
   validateTrust,
@@ -12,7 +12,7 @@ import {
   stateSnapshot,
   makeDecision,
   validateDecision
-} from '../../src/v3/policy.js';
+} from '../../src/policy/policy.js';
 
 function creditFixture() {
   const requester = generateKeyPairSync('ed25519');

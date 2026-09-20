@@ -8,7 +8,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {once} from 'node:events';
 import {auditFile,readUpload} from '../demo/audit-file.js';
-import {check} from '../v3/crypto.js';
+import {check} from '../common/crypto.js';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const equal=(a,b)=>timingSafeEqual(createHash('sha256').update(a).digest(),createHash('sha256').update(b).digest());

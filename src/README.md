@@ -72,8 +72,8 @@ src/
 
 | 목적 | 진입점 | 주요 역할 |
 | --- | --- | --- |
-| **단건 증거 독립 검증** | `src/v3/cli.js verify <config> <evidence>` | 기관 DB 없이 서명, 머클 포함 증명, 블록 당시 정책 및 온체인 상태를 대조하여 단건 거절/승인 검증 |
-| **전체 감사 (사후 조작/삭제 탐지)** | `src/v3/cli.js audit <config> <archive>` | 온체인 앵커 로그 전체를 검사하여 누락(omission), 삭제(deletion), 위변조(tampering) 탐지 |
+| **단건 증거 독립 검증** | `src/cli.js verify <config> <evidence>` | 기관 DB 없이 서명, 머클 포함 증명, 블록 당시 정책 및 온체인 상태를 대조하여 단건 거절/승인 검증 |
+| **전체 감사 (사후 조작/삭제 탐지)** | `src/cli.js audit <config> <archive>` | 온체인 앵커 로그 전체를 검사하여 누락(omission), 삭제(deletion), 위변조(tampering) 탐지 |
 | **AIM 독립 프로세스 시연** | `npm run demo:aim` | 기관 DB 접근 권한이 완전히 차단된 격리 프로세스에서 정상 거절 및 4개 공격 사례 탐지 시연 |
 | **로컬 시나리오 시연 웹 서버** | `npm run demo:local` | Anvil 로컬 체인 기반 5개 시나리오 생성 및 웹 UI 감사 화면 제공 |
 | **기관 Operator 실행** | `npm run operator` | 지갑 초기화, 요청 처리, 온체인 배치 앵커링 및 공용 증거 파일 export |

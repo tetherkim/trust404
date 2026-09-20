@@ -2,8 +2,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 import { encodeFunctionData, parseAbi } from 'viem';
-import { jsonRpc } from '../src/v3/chain.js';
-import { check, addressShape } from '../src/v3/crypto.js';
+import { jsonRpc } from '../src/common/rpc.js';
+import { check, addressShape } from '../src/common/crypto.js';
 
 // Read-only readiness check. No private key is read and no transaction is sent.
 export async function checkBaseSepolia(env) {

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { decodeFunctionData, parseAbi } from 'viem';
-import { check } from '../v3/crypto.js';
+import { check } from '../common/crypto.js';
 
 const baseUrl = 'https://chat.aomi.dev';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));

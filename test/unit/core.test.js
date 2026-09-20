@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonical, parseWire, sign } from '../../src/v3/crypto.js';
-import { evaluate, validateRequest } from '../../src/v3/policy.js';
-import { buildTree, verifyProof } from '../../src/v3/merkle.js';
-import { auditAll, verifyOne, timing } from '../../src/v3/verify.js';
+import { canonical, parseWire, sign } from '../../src/common/crypto.js';
+import { evaluate, validateRequest } from '../../src/policy/policy.js';
+import { buildTree, verifyProof } from '../../src/common/merkle.js';
+import { auditAll, verifyOne, timing } from '../../src/verifier/verify.js';
 import { fixture, paired } from './fixtures.js';
 
 test('정규 JSON 통신: 중복 키 거부, 요청 식별자 및 서명이 모든 필드를 바인딩', () => {

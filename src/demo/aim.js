@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { startDemo } from './local.js';
 
 const exec = promisify(execFile);
-const cli = fileURLToPath(new URL('../v3/cli.js', import.meta.url));
+const cli = fileURLToPath(new URL('../cli.js', import.meta.url));
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
 // Only disposable demo data is removed. Never accepts an operator directory or key.

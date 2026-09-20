@@ -13,7 +13,7 @@ import {createWalletClient,http} from 'viem';
 import {mnemonicToAccount} from 'viem/accounts';
 import {startAuditServer} from '../../src/demo/audit-server.js';
 import {Operator} from '../../src/operator/run.js';
-import {canonical} from '../../src/v3/crypto.js';
+import {canonical} from '../../src/common/crypto.js';
 import {stopProcess} from '../../scripts/local-process.js';
 
 test('[오퍼레이터 데몬] 복수 요청 처리, 상태 재생, 프로세스 재시작 시 중복 배치 없이 안정적 복구', {timeout:60000}, async t=>{
@@ -62,7 +62,7 @@ test('[오퍼레이터 데몬] 복수 요청 처리, 상태 재생, 프로세스
  t.after(()=>rmSync(received,{recursive:true,force:true}));
  cpSync(completed.exportDirectory,received,{recursive:true});
  op.close();op=null;
- const cli=fileURLToPath(new URL('../../src/v3/cli.js',import.meta.url));
+ const cli=fileURLToPath(new URL('../../src/cli.js',import.meta.url));
  const args=[cli,'verify','verify-config.json','evidence.json'];
  const run=()=>promisify(execFile)(process.execPath,args,{cwd:received,timeout:10000});
  const verified=JSON.parse((await run()).stdout);

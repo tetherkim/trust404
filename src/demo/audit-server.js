@@ -4,7 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import { auditFile, readUpload } from './audit-file.js';
-import { check } from '../v3/crypto.js';
+import { check } from '../common/crypto.js';
 
 export async function startAuditServer(profileFile, port = 4040) {
   const file = resolve(profileFile), profiles = new Map();

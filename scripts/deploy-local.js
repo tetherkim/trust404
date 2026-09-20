@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { createPublicClient, createWalletClient, http, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { foundry } from 'viem/chains';
-import { jsonRpc, creditStateAbi, anchorAbi } from '../src/v3/chain.js';
-import { check } from '../src/v3/crypto.js';
+import { jsonRpc } from '../src/common/rpc.js';
+import { creditStateAbi, anchorAbi } from '../src/common/abi.js';
+import { check } from '../src/common/crypto.js';
 import { stopProcess } from './local-process.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));

@@ -1,4 +1,4 @@
-import { auditView } from '../v3/finality.js';
+import { auditView } from '../verifier/finality.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, renameSync, openSync, closeSync, unlinkSync, readdirSync, linkSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -6,11 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { createPublicClient, createWalletClient, http, keccak256, encodeDeployData } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { baseSepolia } from 'viem/chains';
-import { Archive, EvidenceStore } from '../v3/store.js';
-import { ChainReader, jsonRpc } from '../v3/chain.js';
-import { hash, check, canonical } from '../v3/crypto.js';
-import { scope, requestRecord } from '../v3/policy.js';
-import { auditAll } from '../v3/verify.js';
+import { Archive, EvidenceStore } from '../storage/store.js';
+import { ChainReader } from '../chain/reader.js';
+import { jsonRpc } from '../common/rpc.js';
+import { hash, check, canonical } from '../common/crypto.js';
+import { scope, requestRecord } from '../policy/policy.js';
+import { auditAll } from '../verifier/verify.js';
 
 export class Operator {
   constructor(directory, config = { rpcUrl:'https://sepolia.base.org', chain:baseSepolia, token:'0x036cbd53842c5426634e7929541ec2318f3dcf7e' }) {

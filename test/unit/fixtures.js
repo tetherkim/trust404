@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { hash } from '../../src/v3/crypto.js';
-import { requestRecord, scope, makeDecision, receiptRef } from '../../src/v3/policy.js';
-import { buildTree } from '../../src/v3/merkle.js';
+import { hash } from '../../src/common/crypto.js';
+import { requestRecord, scope, makeDecision, receiptRef } from '../../src/policy/policy.js';
+import { buildTree } from '../../src/common/merkle.js';
 export function fixture() {
   const requester = generateKeyPairSync('ed25519'), institution = generateKeyPairSync('ed25519');
   const pub = key => key.export({ type: 'spki', format: 'pem' });

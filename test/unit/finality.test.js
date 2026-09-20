@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditView} from '../../src/v3/finality.js';
+import {auditView} from '../../src/verifier/finality.js';
 const fixture=(height,count=2)=>{
  const latest={count:async()=>2,batch:async()=>({blockNumber:'100'}),assertCanonical:async()=>{},finality:'PROVISIONAL'};
  const finalized={count:async()=>count,finality:'FINALIZED'};

@@ -6,9 +6,9 @@
 
 | AIM 목표 | 구현 | 검증 근거 |
 | --- | --- | --- |
-| 거절을 신뢰 가능한 기록으로 저장 | 요청 서명 → 요청 root 등록 → 판단 서명 → 판단 root 등록 → 공개 증거 export | `src/operator/run.js`, `src/v3/store.js`, `contracts/RecordAnchor.sol` |
-| 거절 레코드 스키마 | 요청·정책·접수 블록·상태·판단을 해시와 서명으로 연결 | 아래 스키마, `src/v3/policy.js`, `src/v3/crypto.js` |
-| 단건 독립 검증 | `evidence.json`의 두 서명·포함 증명·판단 규칙을 별도 CLI에서 검증 | `src/v3/verify.js:verifyOne`, `test/integration/operator.test.js` |
+| 거절을 신뢰 가능한 기록으로 저장 | 요청 서명 → 요청 root 등록 → 판단 서명 → 판단 root 등록 → 공개 증거 export | `src/operator/run.js`, `src/storage/store.js`, `contracts/RecordAnchor.sol` |
+| 거절 레코드 스키마 | 요청·정책·접수 블록·상태·판단을 해시와 서명으로 연결 | 아래 스키마, `src/policy/policy.js`, `src/common/crypto.js` |
+| 단건 독립 검증 | `evidence.json`의 두 서명·포함 증명·판단 규칙을 별도 CLI에서 검증 | `src/verifier/verify.js:verifyOne`, `test/integration/operator.test.js` |
 | 불변성 | 원문 변경 시 서명 또는 체인에 고정된 root와 불일치 | `TAMPERED_EXPORT`, `INVALID_INCLUSION`, `INVALID_SIGNATURE` |
 | 완전성 | 감사 기준 블록의 배치 수·root와 전체 자료를 대조하고 요청별 판단 확인 | `auditAll`, `DATA_UNAVAILABLE`, `MISSING_AS_OF_H` |
 | 기관 서버·DB를 신뢰 근거로 삼지 않는 검증 | 제시받은 기록을 별도로 확인한 공개키·정책 및 온체인 root와 대조 | `verifyOne`, `auditAll`; `demo:aim`은 DB 접근 없이도 성립함을 추가 확인 |
@@ -23,7 +23,7 @@
 - 공통 scope: `version: 3`, `logId`, `chainId`, `anchorAddress`를 포함해 다른 로그·체인의 기록 혼용을 막는다.
 - 요청 레코드: `{kind: "REQUEST", requestId, request: envelope}`. `request-v3`로 서명한다. USDC 정책의 payload는 공통 scope와 `requesterId, institutionId, token, treasury, recipient, amountAtomic, createdAtMs, policyHash`다.
 - 판단 레코드: `{kind: "DECISION", decision: envelope}`. `decision-v3`로 서명한다. USDC 정책의 payload는 공통 scope와 `requestId, policyHash, receiptRef, stateHash, outcome, reason`이다. `receiptRef`는 `batchId, leafIndex, blockNumber, blockHash`로 요청 등록 위치를 고정한다. 상태 조회 없이 한도 초과로 거절하면 `stateHash`는 `null`이다.
-- LTV 정책도 같은 서명 구조를 사용한다. 요청에는 `subject, creditStateAddress, borrowAmountAtomic`이 들어가며, 상태에는 해당 블록의 담보·부채가, 판단에는 계산된 `derived`가 포함된다. 정확한 허용 필드는 `src/v3/policy.js`가 검증한다.
+- LTV 정책도 같은 서명 구조를 사용한다. 요청에는 `subject, creditStateAddress, borrowAmountAtomic`이 들어가며, 상태에는 해당 블록의 담보·부채가, 판단에는 계산된 `derived`가 포함된다. 정확한 허용 필드는 `src/policy/policy.js`가 검증한다.
 - Merkle leaf는 `SHA256(0x00 || UTF8(JCS(record)))`, 내부 노드는 `SHA256(0x01 || leftHashBytes || rightHashBytes)`다. 순서·위치·건수를 검증하며 배치당 최대 32건이다.
 - 체인에는 `root, count, blockNumber, anchoredAt`을 저장한다. 원문·개인키는 올리지 않는다.
 - 단건 `evidence.json`: `{request, decision, snapshot}`. request와 decision은 각각 `{batchId, record, count, index, proof}`이며 proof 항목은 `{side, hash}`다. CLI 입력은 정규 JSON이므로 export된 파일을 그대로 전달한다.

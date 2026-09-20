@@ -7,11 +7,11 @@ import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { setupLocalBaseline } from '../../scripts/deploy-local.js';
-import { RpcRuntimeAdapter } from '../../src/v3/rpc-runtime.js';
-import { Archive, EvidenceStore } from '../../src/v3/store.js';
-import { createEvidenceServer } from '../../src/v3/server.js';
-import { hash, canonical } from '../../src/v3/crypto.js';
-import { scope, requestRecord } from '../../src/v3/policy.js';
+import { RpcRuntimeAdapter } from '../../src/chain/rpc-runtime.js';
+import { Archive, EvidenceStore } from '../../src/storage/store.js';
+import { createEvidenceServer } from '../../src/server/server.js';
+import { hash, canonical } from '../../src/common/crypto.js';
+import { scope, requestRecord } from '../../src/policy/policy.js';
 
 async function listen(server) {
   server.listen(0, '127.0.0.1');

@@ -204,12 +204,12 @@ npm run serve
 | --- | --- |
 | `contracts/RecordAnchor.sol` | 등록 권한과 Merkle root 기록 |
 | `src/operator/` | 지갑·요청 처리·Aomi 연동·export |
-| `src/v3/store.js`, `src/v3/policy.js` | 기록 저장과 정책 판단 |
-| `src/v3/verify.js` | 독립 감사 |
+| `src/storage/store.js`, `src/policy/policy.js` | 기록 저장과 정책 판단 |
+| `src/verifier/verify.js`, `src/cli.js` | 독립 감사 및 검증 CLI |
 | `src/demo/audit-server.js` | 파일 가져오기 서버 |
 | `src/hosted/` | 로컬 요청 화면·영속 대기열·파일 다운로드 |
 | `examples/aomi-base-sepolia/` | 실제 공개 시연 자료와 `execution-check.json` 검증 기록 |
 
 실제 Aomi 경유 거래: [요청 등록](https://sepolia.basescan.org/tx/0xa9f05001d2efd00adb2a2e4af2e7c36863be2cd024311baa28bf77e4a4d6335b) · [판단 등록](https://sepolia.basescan.org/tx/0xe1aa2ff6408a937c7fbb5dc540902ed3d380db5ef3b5b5e8a40441754b4cd43e).
 
-`submit`·`tick`·`run`은 Aomi를 사용하지 않는 직접 RPC 명령입니다. `src/cli.js`와 `npm run demo`는 파일 형식이 다른 초기 오프라인 프로토타입입니다. 현재 시연은 위 절차를 사용합니다.
+`submit`·`tick`·`run`은 Aomi를 사용하지 않는 직접 RPC 명령입니다. 독립 검증은 `npm run evidence` (`src/cli.js`) 및 `npm run demo:aim`을 통해 수행됩니다.

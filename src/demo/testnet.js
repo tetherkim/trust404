@@ -2,11 +2,12 @@ import { createServer } from 'node:http';
 import { generateKeyPairSync } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { Archive, EvidenceStore } from '../v3/store.js';
-import { ChainReader, jsonRpc } from '../v3/chain.js';
-import { hash, canonical, check } from '../v3/crypto.js';
-import { requestRecord, scope } from '../v3/policy.js';
-import { auditAll } from '../v3/verify.js';
+import { Archive, EvidenceStore } from '../storage/store.js';
+import { ChainReader } from '../chain/reader.js';
+import { jsonRpc } from '../common/rpc.js';
+import { hash, canonical, check } from '../common/crypto.js';
+import { requestRecord, scope } from '../policy/policy.js';
+import { auditAll } from '../verifier/verify.js';
 
 const directory = resolve('.local-demo/testnet');
 mkdirSync(directory, { recursive: true, mode: 0o700 });

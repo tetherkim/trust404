@@ -1,5 +1,5 @@
-import { jsonRpc } from '../src/v3/chain.js';
-import { check } from '../src/v3/crypto.js';
+import { jsonRpc } from '../src/common/rpc.js';
+import { check } from '../src/common/crypto.js';
 
 // Read-only: no key, wallet, faucet, or transaction submission is involved.
 const rpc = jsonRpc(process.env.TESTNET_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com');

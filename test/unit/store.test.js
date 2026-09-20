@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Archive, EvidenceStore } from '../../src/v3/store.js';
-import { createEvidenceServer } from '../../src/v3/server.js';
-import { canonical } from '../../src/v3/crypto.js';
-import { verifyOne, auditAll } from '../../src/v3/verify.js';
+import { Archive, EvidenceStore } from '../../src/storage/store.js';
+import { createEvidenceServer } from '../../src/server/server.js';
+import { canonical } from '../../src/common/crypto.js';
+import { verifyOne, auditAll } from '../../src/verifier/verify.js';
 import { fixture, FakeChain } from './fixtures.js';
 
 test('SQLite 저장소: 프로세스 재시작 시 멱등성 유지, 동결된 배치 및 독립 아카이브 보존', async t => {
