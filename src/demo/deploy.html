@@ -1,9 +1,4 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TRUST404 · 감사 콘솔</title>
-<style>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TRUST404 · 운영자 배포</title><style>
 :root{color-scheme:dark;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0d0c13;color:#e9e6f1;line-height:1.45;--muted:#a39bad;--line:#2b2638;--purple:#b49aff;--green:#8bd6b1;--amber:#f6ba78;--red:#ff969e}
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(110deg,#17102355,transparent 60%);min-height:100vh}button{font:inherit;cursor:pointer;color:inherit}button:disabled{opacity:.45;cursor:wait}button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--purple);outline-offset:3px}
 header{border-bottom:1px solid var(--line);padding:14px 26px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-weight:850;font-size:20px;letter-spacing:-.04em}.brand span{color:var(--purple)}.brand small{font:10px ui-monospace,monospace;color:var(--muted);letter-spacing:.12em;margin-left:18px}.env{display:flex;flex-wrap:wrap;gap:8px;font:10px ui-monospace,monospace}.tag{border:1px solid var(--line);padding:5px 8px;color:var(--muted)}
@@ -17,23 +12,7 @@ main{max-width:1600px;margin:auto;padding:22px 26px}.toolbar{display:flex;align-
 @media(max-width:540px){header{align-items:flex-start;padding:12px}.env{justify-content:flex-end;max-width:220px;font-size:9px;gap:4px}.tag{padding:4px 5px}main{padding:14px 12px}.toolbar{align-items:flex-start;flex-wrap:wrap}h1{font-size:21px}h1 small{display:block;margin:5px 0 0}.actions{width:100%}.actions button{flex:1}.stats{grid-template-columns:1fr 1fr}.stat{border-bottom:1px solid var(--line)}.stat:nth-child(2){border-right:0}.stat:nth-child(3){border-bottom:0}.artifacts th{width:95px}th,td{padding:9px 10px}.panel-head{font-size:10px}.context dd{font-size:10px}.footer{font-size:8px}}
 #profile-info,#file-info{white-space:normal;overflow-wrap:anywhere;display:block}input[type=file]{max-width:100%}.checks li{overflow-wrap:anywhere}.matrix td:first-child{max-width:240px;overflow-wrap:anywhere;font-family:ui-monospace,monospace}
 .deployment-actions{display:flex;gap:8px;flex-wrap:wrap;padding:14px}.deployment-state{padding:0 14px 14px;font:10px ui-monospace,monospace;color:var(--muted);overflow-wrap:anywhere}.deployment-state strong{color:#e9e6f1}.wallet-note{padding:0 14px 14px;color:var(--muted);font-size:11px}
-</style>
-</head>
-<body>
-<header><div class="brand">TRUST<span>404</span><small>보안 기록 감사</small></div><div class="env"><span class="tag">독립 검증기</span><span class="tag">체인 + 감사 파일</span></div></header>
-<main>
-<div class="toolbar"><h1>증거 기록 감사 <small>JSON 보관 기록 / 독립 재검증</small></h1><button class="primary" id="run" disabled>파일 검증</button></div>
-<div id="load-error" class="error" role="alert"></div>
-<section class="panel"><div class="panel-head">01 / 감사 파일 입력</div><div class="context">
-<div><label for="file" class="label">감사 파일 · JSON · 최대 2MB</label><p><input type="file" id="file" accept=".json,application/json" disabled></p><span id="file-info" class="code muted">선택된 파일 없음</span></div>
-<div aria-live="polite"><span class="label">자동 확인된 검증 대상 · 읽기 전용</span><p id="profile-name">파일 입력 대기</p><span id="profile-info" class="code muted">—</span></div>
-</div><details><summary>샘플 파일 / 로컬 테스트 체인</summary><p class="code" id="samples"></p><p class="muted">내려받기 → JSON 선택 → 검증. 서버를 다시 시작하면 로컬 샘플이 바뀝니다.</p></details></section>
-<div class="stats"><div class="stat"><span class="label">요청 수</span><strong id="count-requests">—</strong></div><div class="stat"><span class="label">온체인 배치</span><strong id="count-batches">—</strong></div><div class="stat"><span class="label">탐지 사항</span><strong id="count-issues">—</strong></div><div class="stat"><span class="label">보관 자료</span><strong id="coverage" style="font-size:13px">—</strong></div></div>
-<section class="panel" aria-live="polite"><div class="panel-head"><span>02 / 감사 결과</span><small id="duration">—</small></div><div class="verdict"><strong id="verdict">실행 전</strong><small id="finality">—</small></div>
-<div class="table-wrap"><table class="matrix"><thead><tr><th>요청 ID</th><th>등록 시점</th><th>기록 / 정책</th><th>판정 / 오류</th></tr></thead><tbody id="requests"></tbody></table></div>
-<ul class="checks" id="issues"></ul></section>
-<section class="panel artifacts"><div class="panel-head">03 / 신뢰 기준과 체인 참조값</div><table><tbody id="references"></tbody></table><details><summary>감사 원본 JSON</summary><pre id="raw">실행 전</pre></details></section>
-
-<div class="footer"><span>감사 검증은 서명·거래 전송 없음 · RPC는 서버 설정 사용</span><span>감사 파일 자체는 신뢰 기준을 결정하지 않음</span></div>
-</main><script src="/ui.js" defer></script>
-</body></html>
+</style></head><body><main><h1>운영자 배포</h1><section class="panel" id="deployment-panel"><div class="panel-head"><span>운영자 / Base Sepolia 기록 계약 배포</span><small id="deploy-network">불러오는 중</small></div>
+<div class="context"><div><span class="label">기록 등록 권한자</span><p class="code" id="deploy-publisher">—</p></div><div><span class="label">배포 전 점검</span><p class="code" id="deploy-simulation">—</p></div></div>
+<div class="deployment-actions"><button class="secondary" id="connect-wallet" disabled>MetaMask 연결</button><button class="primary" id="deploy-contract" disabled>배포 거래 서명 요청</button></div>
+<div class="deployment-state" id="deploy-state" role="status">배포 정보를 확인하고 있습니다.</div><div class="wallet-note">배포 버튼은 지갑에 거래 내용을 표시합니다. 최종 서명은 지갑 확장 프로그램에서 직접 승인합니다.</div></section></main><script src="/deploy.js" defer></script></body></html>

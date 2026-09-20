@@ -151,7 +151,6 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
         data: encodeDeployData({ abi: anchorArtifact.abi, bytecode: anchorArtifact.bytecode.object, args: [publisher] }),
         value: '0x0',
       },
-      simulation: { status: 'PASSED', gasEstimate: '220958' },
     } : null;
     if (profileFile) {
       for (const config of JSON.parse(readFileSync(profileFile, 'utf8'))) {
@@ -162,6 +161,8 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
     }
     const index = readFileSync(new URL('./index.html', import.meta.url));
     const js = readFileSync(new URL('./ui.js', import.meta.url));
+    const deployHtml = readFileSync(new URL('./deploy.html', import.meta.url));
+    const deployJs = readFileSync(new URL('./deploy.js', import.meta.url));
     server = httpServer(async (req, res) => {
       const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff',
         'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'" };
@@ -176,8 +177,8 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
           res.writeHead(200, { ...headers, 'content-type': 'application/json' }).end(canonical(result)); return;
         }
         if (req.method !== 'GET') { res.writeHead(405, headers).end(); return; }
-        if (path === '/' || path === '/ui.js') {
-          res.writeHead(200, { ...headers, 'content-type': path === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8' }).end(path === '/' ? index : js); return;
+        if (['/', '/ui.js', '/operator/deploy', '/deploy.js'].includes(path)) {
+          res.writeHead(200, { ...headers, 'content-type': path.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8' }).end(({ '/': index, '/ui.js': js, '/operator/deploy': deployHtml, '/deploy.js': deployJs })[path]); return;
         }
         let result;
         if (path === '/api/deployment') result = deployment ?? { status: 'NOT_CONFIGURED' };
