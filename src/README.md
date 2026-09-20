@@ -1,69 +1,119 @@
-# 소스 코드 안내
+# TRUST404 Core System Architecture (`src/`)
 
-본 프로젝트는 **오프체인 의사결정(승인/거절)을 제3자가 기관의 서버나 DB를 신뢰하지 않고 독립적으로 검증할 수 있는 신뢰 인프라**입니다. ([AIM 대응 문서](../AIM-COVERAGE.md), [QNA](../../QNA.md) 참고)
-
-전체 제품 흐름은 **요청 접수 및 서명 → 결정 생성 및 오프체인 기록 → 머클 배치 집계 및 온체인 앵커링(Aomi/Direct RPC) → 공개 증거/아카이브 export → 독립 제3자 검증**으로 구성됩니다.
+본 디렉터리는 **기관의 서버나 데이터베이스를 전혀 신뢰하지 않고도, 오프체인 의사결정(승인/거절)의 진위와 정책 준수 여부를 제3자가 독립적으로 검증할 수 있도록 지원하는 무신뢰(Zero-Trust) 감사 인프라의 핵심 코어**입니다.
 
 ---
 
-## 역할별 디렉터리 구조
+## 1. 아키텍처 설계 원칙 (Design Principles)
 
-코드의 응집도와 가독성을 높이기 위해 역할 및 책임별로 디렉터리가 모듈화되어 있으며, 공통 모듈은 `src/common`에 통합되어 있습니다.
+1. **선(先)요청 앵커링 (Commitment-First)**:
+   판단(승인/거절)을 내리기 전에 사용자의 요청을 온체인 배치에 먼저 등록합니다. 이를 통해 기관이 불리한 요청을 사후에 은폐하거나 삭제(Censorship)하는 행위를 원천 차단합니다.
+2. **2계층 독립 검증 (2-Layer Independent Verification)**:
+   - **Layer 1 (기록 무결성)**: 서명과 머클 증명을 통해 원문 데이터가 블록체인에 등록된 루트와 일치하는지 확인.
+   - **Layer 2 (결정론적 정책 재평가)**: 요청 당시 온체인 상태(N번 블록의 담보/부채/준비금)를 스냅샷으로 재현하여, 감사자가 동일한 정책 코드로 재평가(Replay)했을 때 기관의 판단 사유와 1 bit도 틀림없이 일치하는지 확인.
+3. **엄격한 스키마 및 정규화 (RFC Compliance)**:
+   데이터 조작이나 파싱 차이(Parser Differential) 공격을 막기 위해 정규 JSON(RFC 8785 JCS), 해시 기반 머클 트리(RFC 6962), Ed25519 엔벨로프 서명 규격을 엄격히 준수합니다.
 
+---
+
+## 2. 엔드-투-엔드 데이터 파이프라인 (Data Flow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Requester as 사용자 (Requester)
+    participant Operator as 기관 운영자 (Operator)
+    participant Storage as 영속성 원장 (EvidenceStore)
+    participant Chain as 블록체인 (RecordAnchor)
+    actor Auditor as 독립 감사관 (Auditor / CLI)
+
+    Requester->>Operator: 서명된 요청 전송 (request-v3)
+    Operator->>Storage: 요청 검증 및 SQLite 저장
+    Operator->>Chain: 머클 배치 앵커링 (요청 Root 등록)
+    Note over Operator,Chain: 요청 접수 블록(N) 확정
+
+    Operator->>Operator: 블록 N 시점 온체인 상태 스냅샷 조회 & 정책 평가
+    Operator->>Storage: 서명된 판단 저장 (decision-v3, receiptRef 바인딩)
+    Operator->>Chain: 머클 배치 앵커링 (판단 Root 등록)
+
+    Operator->>Auditor: 공개 증거 파일 발행 (evidence.json / audit.json)
+    Note over Auditor: 기관 DB 접근 차단 (Zero-Trust)
+    Auditor->>Chain: 온체인 Merkle Root 및 블록 N 상태 직접 조회 (RPC)
+    Auditor->>Auditor: verifyOne / auditAll (서명 + 포함 증명 + 정책 재평가)
 ```
+
+---
+
+## 3. 디렉터리 및 모듈별 책임 (Module Inventory)
+
+```text
 src/
-├── common/             # 공통 암호학, 머클 트리, RPC, 컨트랙트 ABI
-│   ├── crypto.js       # 정규 JSON (RFC 8785 JCS), SHA-256, Ed25519 서명/검증, 스키마 검사
-│   ├── merkle.js       # RFC 6962 호환 머클 트리 빌더 및 감사 경로(Inclusion Proof) 검증
-│   ├── rpc.js          # 경량 JSON-RPC 2.0 클라이언트 및 16진수 수량 변환기
-│   ├── abi.js          # RecordAnchor, CreditState, ERC20 인터페이스 ABI
-│   └── index.js        # common 배럴 export
-├── policy/             # 비즈니스 결정 정책 및 스키마 평가
-│   └── policy.js       # USDC 준비금 정책, 신용 LTV 정책, 상태 스냅샷, 결정 생성 및 평가
-├── verifier/           # 독립 제3자 검증 및 감사 엔진
+├── common/             # [기반 계층] 공통 암호학, 머클 트리, RPC, 컨트랙트 ABI
+│   ├── crypto.js       # RFC 8785 JCS 정규화, SHA-256(도메인 분리), Ed25519 서명/검증
+│   ├── merkle.js       # RFC 6962 표준 이진 머클 트리 빌더 및 포함 증명(Audit Path) 검증
+│   ├── rpc.js          # 무의존성 JSON-RPC 2.0 클라이언트 및 BigInt 수량 포맷터
+│   ├── abi.js          # RecordAnchor, CreditState, ERC-20 인터페이스 ABI
+│   └── index.js        # common 모듈 배럴 export
+├── policy/             # [도메인 계층] 금융 정책 평가 및 결정론적 룰 엔진
+│   └── policy.js       # USDC 준비금 정책, LTV 담보 정책, 스냅샷 규격 검증, 정책 재평가
+├── verifier/           # [검증 계층] 제3자 독립 검증 및 전수 감사 코어
 │   ├── verify.js       # 단건 독립 검증(verifyOne), 전수 누락/위변조 감사(auditAll), SLA 타이밍
-│   └── finality.js     # 감사 기준 체인 확정(Finalized) 뷰 결정기
-├── chain/              # 블록체인 상태 조회 및 런타임
-│   ├── reader.js       # 온체인 배치/상태 검증기 (ChainReader, ChainView, anchorCall)
-│   └── rpc-runtime.js  # 과거 블록 상태 재생(Replay) 및 로컬 시뮬레이션/트랜잭션 실행기
-├── storage/            # 영속성 저장소 및 공개 아카이브
-│   └── store.js        # SQLite WAL 기반 레코드 저장소(EvidenceStore), 동일 ID 덮어쓰기를 거부하는 파일 아카이브(Archive)
-├── server/             # 내부 증거 관리 HTTP API
-│   └── server.js       # 서명된 요청 접수, 배치 준비, 의사결정 평가용 하위 HTTP 서비스
-├── operator/           # 기관 운영자(트랜잭션 앵커링 및 Aomi)
-│   ├── run.js          # 지갑/키 관리, 배치 앵커링, 복구 저널, 증거 export 데몬
-│   └── aomi.js         # Aomi SDK 및 SIWE 인증 연동, 트랜잭션 시뮬레이션
-└── cli.js              # 통합 단건 검증 및 전수 감사 CLI (verify, audit, serve)
+│   └── finality.js     # 감사 기준 체인 완결성(Finality: Finalized vs Provisional) 뷰 결정기
+├── chain/              # [인프라 계층] 온체인 인터페이스 및 상태 재생(Replay) 런타임
+│   ├── reader.js       # 온체인 블록/배치 조회기 (ChainReader, ChainView, anchorCall)
+│   └── rpc-runtime.js  # N번 블록 상태 재현(Replay) 및 로컬 트랜잭션 시뮬레이션 하네스
+├── storage/            # [영속성 계층] 무결성 보존 저장소
+│   └── store.js        # SQLite WAL 원장(EvidenceStore) 및 덮어쓰기 불허 파일 아카이브(Archive)
+├── server/             # [통신 계층] 내부 증거 관리 HTTP API
+│   └── server.js       # 서명된 요청 접수, 배치 준비, 2계층 검증 JSON 반환 엔드포인트
+├── operator/           # [운영 계층] 기관 배치 제출 데몬 및 Aomi 연동
+│   ├── run.js          # 지갑 초기화, 트랜잭션 앵커링, 장애 복구 저널, 증거 export 데몬
+│   └── aomi.js         # Aomi Agent SDK 및 SIWE 연동, 시뮬레이션 성공 필수 검증기
+└── cli.js              # [진입점] 독립 제3자 검증 통합 CLI (verify, audit, serve)
 ```
 
 ---
 
-## 공통 모듈 (`src/common/`)
+## 4. 암호학 및 데이터 표준 명세 (Cryptographic Specs)
 
-- **`crypto.js`**:
-  - `canonical(value)`: RFC 8785 (JCS) 표준에 따른 엄격한 정규화 JSON 직렬화. 키 정렬과 올바른 유니코드 문자열 검사를 수행하며 NFC 등의 문자 정규화는 하지 않음.
-  - `parseWire(text)`: 수신된 텍스트가 정규화된 형태와 100% 일치하는지 검사하여 불법 인코딩 공격 차단.
-  - `hash(domain, payload)`: 도메인 분리(Domain Separation)가 적용된 SHA-256 해시 계산.
-  - `sign(domain, keyId, payload, privateKey)` & `verifySignature(...)`: Ed25519 기반 메시지 엔벨로프 서명 및 검증.
-  - `check(condition, code)` & `fields(value, expected)`: 불변식 및 엄격한 스키마 검증.
-- **`merkle.js`**:
-  - `buildTree(records)`: RFC 6962 방식(Leaf: `0x00`, Branch: `0x01`, Power-of-2 split)의 머클 트리 생성 및 루트 해시 도출.
-  - `verifyProof(record, index, count, proof, root)`: 특정 요청이나 결정이 온체인 루트에 포함되어 있음을 검증하는 감사 경로 증명.
-- **`rpc.js`**:
-  - `jsonRpc(url, options)`: 타임아웃 및 표준 오류 검증을 내장한 JSON-RPC 2.0 요청 헬퍼.
-- **`abi.js`**:
-  - `RecordAnchor`: 온체인 머클 루트 및 배치 카운트 관리 컨트랙트 ABI.
-  - `CreditState`: 차입자 담보(collateral) 및 부채(debt) 상태 컨트랙트 ABI.
+| 기술 요소 | 표준 규격 | 시스템 적용 방식 및 특징 |
+| :--- | :--- | :--- |
+| **정규 JSON** | **RFC 8785 (JCS)** | 키 사전순 정렬, 공백 제거, IEEE 754 부동소수점 정규화. 비정규 포맷 수신 시 즉시 차단. |
+| **머클 트리** | **RFC 6962** | Leaf: `SHA256(0x00 \|\| UTF8(JCS(record)))`<br>Branch: `SHA256(0x01 \|\| Left \|\| Right)` (2의 거듭제곱 분할) |
+| **전자서명** | **Ed25519** | 메시지 엔벨로프 `{ domain, keyId, payload, signature }`<br>도메인 분리(`request-v3`, `decision-v3`) 적용 |
+| **온체인 앵커** | **EVM Contract** | `RecordAnchor.sol`에 배치 ID별 `root`, `count`, `blockNumber`, `anchoredAt` 영구 불변 기록 |
 
 ---
 
-## 실행 흐름과 주요 진입점
+## 5. 핵심 에러 코드 매트릭스 (Error Code Matrix)
 
-| 목적 | 진입점 | 주요 역할 |
-| --- | --- | --- |
-| **단건 증거 독립 검증** | `src/cli.js verify <config> <evidence>` | 기관 DB 없이 서명, 머클 포함 증명, 블록 당시 정책 및 온체인 상태를 대조하여 단건 거절/승인 검증 |
-| **전체 감사 (사후 조작/삭제 탐지)** | `src/cli.js audit <config> <archive>` | 온체인 앵커 로그 전체를 검사하여 누락(omission), 삭제(deletion), 위변조(tampering) 탐지 |
-| **AIM 독립 프로세스 시연** | `npm run demo:aim` | 기관 DB 접근 권한이 완전히 차단된 격리 프로세스에서 정상 거절 및 4개 공격 사례 탐지 시연 |
-| **로컬 시나리오 시연 웹 서버** | `npm run demo:local` | Anvil 로컬 체인 기반 5개 시나리오 생성 및 웹 UI 감사 화면 제공 |
-| **기관 Operator 실행** | `npm run operator` | 지갑 초기화, 요청 처리, 온체인 배치 앵커링 및 공용 증거 파일 export |
-| **웹 판단 요청 포털** | `npm run serve` | 사용자 요청 접수, 백그라운드 큐 처리 및 감사 자료 다운로드 |
+감사 과정에서 탐지되는 모든 이상 징후는 명확한 표준 에러 코드로 분기됩니다:
+
+| 에러 코드 | 검증 계층 | 발생 원인 및 보안 의미 |
+| :--- | :--- | :--- |
+| **`TAMPERED_EXPORT`** | Layer 1 (무결성) | 아카이브 원본 또는 내보낸 증거 파일의 내용이 변조되어 온체인 Merkle Root와 불일치함. |
+| **`INVALID_INCLUSION`** | Layer 1 (무결성) | 머클 포함 증명(Merkle Audit Path) 경로 해시가 유효하지 않거나 위조됨. |
+| **`INVALID_SIGNATURE`** | Layer 1 (무결성) | 요청자 또는 기관의 Ed25519 전자서명이 서명자 공개키와 불일치함. |
+| **`DATA_UNAVAILABLE`** | Layer 1 (보관성) | 온체인에는 앵커링되었으나, 기관이 해당 배치의 원문 레코드를 유실/은폐함. |
+| **`MISSING_AS_OF_H`** | Layer 2 (SLA) | 요청이 등록된 후 약정 기한(예: 90초)이 경과하도록 온체인에 판단 결과가 등록되지 않음. |
+| **`POLICY_MISMATCH`** | Layer 2 (정책 준수) | 기관이 서명한 거절/승인 사유가 당시 블록의 온체인 스냅샷으로 재평가한 결과와 다름 (허위 서명 적발). |
+
+---
+
+## 6. 독립 검증 CLI 사용법 (`src/cli.js`)
+
+기관 서버나 DB 접속 없이, 독립된 감사관 컴퓨터에서 온체인 RPC와 공개 파일만으로 검증을 수행합니다.
+
+### 1) 단건 증거 검증 (`verify`)
+```bash
+node src/cli.js verify <config.json> <evidence.json>
+```
+- **검증 항목**: 요청자/기관 서명, 온체인 머클 포함 증명, 블록 당시 스냅샷 상태 대조 및 정책 재평가.
+- **출력**: `ok: true`, `outcome: "REJECTED"`, `reason: "RESERVE_FLOOR"`, `asOf: { blockHash: "0x..." }`
+
+### 2) 배치 전수 감사 (`audit`)
+```bash
+node src/cli.js audit <config.json> <archive_directory>
+```
+- **검증 항목**: 감사 기준 블록까지 체인에 기록된 모든 배치의 완전성, 누락, 위변조, SLA 지연 검사.
+- **출력**: `complete: true`, `issues: []`, `batchCount: N`, `finality: "FINALIZED"`
