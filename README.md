@@ -208,3 +208,7 @@ sequenceDiagram
 ### Aomi hosted signing 확인 (2026-09-20)
 
 현재 계정의 Privy EVM 지갑 `0xb88122f378189b3dac4efea164181e2191489726`은 Manual입니다. Portal에서 Enable automatic signing → provider 위임 → 해당 지갑 Auto 순서가 표시됩니다. 아직 위임하거나 자동 전송을 검증하지 않았습니다. 이 지갑은 현재 운영 publisher와 다르므로 위임 승인만으로 기존 계약에 등록할 수 없습니다. 새 계약과 별도의 실행 경로 검증이 필요합니다. 표시된 provider 위임이 TRUST404 계약에만 제한된다는 근거는 아직 없습니다.
+
+### Aomi 위임 적용 후 검증
+
+2026-09-20 Portal에서 Privy EVM 지갑 `0xb88122f378189b3dac4efea164181e2191489726`의 Auto 정책을 적용했고, 위임 유효일 2026-09-27을 확인했습니다. Base Sepolia의 기존 계약 `publisher()` 호출로 Pipeline stage와 simulate는 통과했지만 CLI commit은 HTTP 422로 거부됐습니다. receipt는 확인되지 않았으며 hosted 자동 전송 성공을 주장하지 않습니다. 해당 Privy 지갑의 test ETH 잔액은 0입니다. 이 사실만으로 422 원인이 잔액이라고 단정할 수 없습니다. 기존 직접 RPC worker와 Aomi hosted 실행은 아직 분리되어 있습니다.
