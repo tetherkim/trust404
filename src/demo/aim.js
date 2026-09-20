@@ -12,11 +12,11 @@ const cli = fileURLToPath(new URL('../v3/cli.js', import.meta.url));
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
 // Only disposable demo data is removed. Never accepts an operator directory or key.
-export async function demonstrateAim(report = console.log) {
+export async function demonstrateAim(report = console.log, { signal } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'trust404-aim-'));
   let demo;
   try {
-    demo = await startDemo({ port: 0, directory, profileFile: null, deploymentPublisher: null });
+    demo = await startDemo({ port: 0, directory, profileFile: null, deploymentPublisher: null, signal, report });
     const { scenarios } = await (await fetch(`${demo.url}/api/status`)).json();
     const auditor = join(directory, 'auditor');
     for (const scenario of scenarios) {
@@ -37,7 +37,7 @@ export async function demonstrateAim(report = console.log) {
     const database = join(demo.runDirectory, 'rejection', 'records.sqlite');
     assert.equal(existsSync(database), true);
     await assert.rejects(exec(process.execPath, [...permissions, '-e',
-      'require("node:fs").readFileSync(process.argv[1])', database], { cwd: auditor }),
+      'require("node:fs").readFileSync(process.argv[1])', database], { cwd: auditor, signal, timeout: 5000 }),
     error => error.code === 1 && /ERR_ACCESS_DENIED/.test(error.stderr));
     report('PASS 기관 DB 보존 · 검증 프로세스의 기관 DB 읽기 권한 차단');
     const run = async (id, command, expectedExit) => {
@@ -45,7 +45,7 @@ export async function demonstrateAim(report = console.log) {
       const args = [...permissions, cli, command, join(folder, 'config.json')];
       if (command === 'verify') args.push(join(folder, 'evidence.json'));
       let output, code = 0;
-      try { output = await exec(process.execPath, args, { cwd: auditor, timeout: 20000 }); }
+      try { output = await exec(process.execPath, args, { cwd: auditor, signal, timeout: 20000 }); }
       catch (error) { output = error; code = error.code; }
       assert.equal(code, expectedExit, output.stderr);
       return JSON.parse(output.stdout);

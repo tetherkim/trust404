@@ -9,6 +9,7 @@ import { mnemonicToAccount } from 'viem/accounts';
 import { foundry } from 'viem/chains';
 import { jsonRpc, creditStateAbi, anchorAbi } from '../src/v3/chain.js';
 import { check } from '../src/v3/crypto.js';
+import { stopProcess } from './local-process.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
@@ -51,19 +52,18 @@ export async function setupLocalBaseline({ port, silent = true } = {}) {
   });
 
   const teardown = async () => {
-    if (child.pid && child.exitCode === null && child.signalCode === null) {
-      const exited = once(child, 'exit');
-      child.kill();
-      await exited;
-    }
+    await stopProcess(child);
   };
 
   try {
 
-  const rpc = jsonRpc(rpcUrl, { timeoutMs: 3000 });
+  const rpc = jsonRpc(rpcUrl, { timeoutMs: 500 });
+  const startupDeadline = Date.now() + 5000;
   let ready = false;
   for (let i = 0; i < 100; i++) {
     if (spawnError) throw new Error('ANVIL_UNAVAILABLE');
+    if (child.exitCode !== null || child.signalCode !== null) throw new Error('ANVIL_EXITED');
+    if (Date.now() >= startupDeadline) break;
     try {
       if (BigInt(await rpc('eth_chainId', [])) === 31337n) {
         ready = true;
@@ -79,10 +79,10 @@ export async function setupLocalBaseline({ port, silent = true } = {}) {
   const alice = mnemonicToAccount('test test test test test test test test test test test junk', { addressIndex: 1 });
 
   const wallet = createWalletClient({ account, chain: foundry, transport: http(rpcUrl) });
-  const client = createPublicClient({ chain: foundry, transport: http(rpcUrl) });
+  const client = createPublicClient({ chain: foundry, pollingInterval: 50, cacheTime: 0, transport: http(rpcUrl, { timeout: 2000, retryCount: 0 }) });
 
   const receipt = async txHash => {
-    const tx = await client.waitForTransactionReceipt({ hash: txHash });
+    const tx = await client.waitForTransactionReceipt({ hash: txHash, timeout: 5000 });
     check(tx.status === 'success', 'LOCAL_TRANSACTION_FAILED');
     return tx;
   };

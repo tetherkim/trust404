@@ -17,6 +17,7 @@ import { addressShape, canonical, hash, sign, check } from '../v3/crypto.js';
 import { requestRecord, scope } from '../v3/policy.js';
 import { buildTree } from '../v3/merkle.js';
 import { auditFile, readUpload } from './audit-file.js';
+import { stopProcess, closeHttpServer } from '../../scripts/local-process.js';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const cases = [
@@ -30,7 +31,7 @@ async function listen(server, port = 0) {
   server.listen(port, '127.0.0.1'); await once(server, 'listening'); return server.address().port;
 }
 async function closeServer(server) {
-  if (server?.listening) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  await closeHttpServer(server);
 }
 async function unusedPort() {
   const server = netServer(), port = await listen(server); await closeServer(server); return port;
@@ -40,7 +41,8 @@ const artifact = (file, name) => JSON.parse(readFileSync(join(root, 'out', file,
 // This harness always spawns its own loopback chain. It never accepts an external
 // RPC or a real signing key; the public Anvil account is usable only here.
 export async function startDemo({ port = 4040, directory = join(root, '.local-demo'), profileFile = process.env.AUDIT_PROFILES_FILE,
-  deploymentPublisher = process.env.WALLET_ADDRESS } = {}) {
+  deploymentPublisher = process.env.WALLET_ADDRESS, signal, report = () => {} } = {}) {
+  signal?.throwIfAborted();
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const runDirectory = mkdtempSync(join(directory, 'run-'));
   const rpcPort = await unusedPort(), rpcUrl = `http://127.0.0.1:${rpcPort}`;
@@ -49,28 +51,43 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
   child.on('error', error => { spawnError = error; });
   const close = async () => {
     await closeServer(server);
-    if (child.pid && child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill(); await exited; }
+    await stopProcess(child);
+    signal?.removeEventListener('abort', onAbort);
   };
+  const onAbort = () => { void close().catch(() => {}); };
+  signal?.addEventListener('abort', onAbort, { once: true });
   try {
-    const rpc = jsonRpc(rpcUrl, { timeoutMs: 3000 });
+    signal?.throwIfAborted();
+    const rpc = jsonRpc(rpcUrl, { timeoutMs: 500 });
+    const startupDeadline = Date.now() + 5000;
     let ready = false;
     for (let i = 0; i < 100; i++) {
+      signal?.throwIfAborted();
       if (spawnError) throw new Error('ANVIL_UNAVAILABLE');
+      if (child.exitCode !== null || child.signalCode !== null) throw new Error('ANVIL_EXITED');
+      if (Date.now() >= startupDeadline) break;
       try { check(BigInt(await rpc('eth_chainId', [])) === 31337n, 'LOCAL_CHAIN_REQUIRED'); ready = true; break; }
       catch { await new Promise(r => setTimeout(r, 50)); }
     }
     check(ready, 'LOCAL_CHAIN_UNAVAILABLE');
     const account = mnemonicToAccount('test test test test test test test test test test test junk');
-    const wallet = createWalletClient({ account, chain: foundry, transport: http(rpcUrl) });
-    const client = createPublicClient({ chain: foundry, transport: http(rpcUrl) });
+    const transport = () => http(rpcUrl, { timeout: 2000, retryCount: 0, fetchOptions: { signal } });
+    const wallet = createWalletClient({ account, chain: foundry, transport: transport() });
+    // Anvil may return the tx hash before mining; mainnet's 4s polling makes
+    // sequential local deployments exceed the test deadline.
+    const client = createPublicClient({ chain: foundry, pollingInterval: 50, cacheTime: 0, transport: transport() });
     const anchorArtifact = artifact('RecordAnchor.sol', 'RecordAnchor');
     const tokenArtifact = artifact('RecordAnchor.t.sol', 'TestToken');
     const receipt = async txHash => {
-      const tx = await client.waitForTransactionReceipt({ hash: txHash }); check(tx.status === 'success', 'LOCAL_TRANSACTION_FAILED'); return tx;
+      signal?.throwIfAborted();
+      const tx = await client.waitForTransactionReceipt({ hash: txHash, timeout: 5000 }); check(tx.status === 'success', 'LOCAL_TRANSACTION_FAILED'); return tx;
     };
     const deploy = async (compiled, args = []) => (await receipt(await wallet.deployContract({ abi: compiled.abi, bytecode: compiled.bytecode.object, args }))).contractAddress.toLowerCase();
     const records = new Map();
     for (const scenario of cases) {
+      signal?.throwIfAborted();
+      report(`로컬 체인 시나리오 준비: ${scenario.title}`);
+      signal?.throwIfAborted();
       const dir = join(runDirectory, scenario.id); mkdirSync(dir, { mode: 0o700 });
       const anchorAddress = await deploy(anchorArtifact, [account.address]), token = await deploy(tokenArtifact);
       const treasury = account.address.toLowerCase();
@@ -91,7 +108,8 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
         const apiPort = await listen(api);
         const post = async (path, body = {}) => {
           const response = await fetch(`http://127.0.0.1:${apiPort}/v3${path}`, { method: 'POST',
-            headers: { authorization: `Bearer ${writeToken}` }, body: canonical(body) });
+            headers: { authorization: `Bearer ${writeToken}` }, body: canonical(body),
+            signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000) });
           check(response.ok, 'LOCAL_API_FAILED'); return response.json();
         };
         const request = requestRecord({ ...scope(policy), requesterId: 'requester', institutionId: policy.institutionId,

@@ -17,6 +17,7 @@ import { canonical, hash, sign } from '../../src/v3/crypto.js';
 import { scope, requestRecord } from '../../src/v3/policy.js';
 import { buildTree } from '../../src/v3/merkle.js';
 import { fixture } from '../v3/fixtures.js';
+import { stopProcess, closeHttpServer } from '../../scripts/local-process.js';
 
 const artifact = name => JSON.parse(readFileSync(new URL(`../../out/${name}.sol/${name === 'RecordAnchor.t' ? 'TestToken' : name}.json`, import.meta.url), 'utf8'));
 async function freePort() {
@@ -26,22 +27,32 @@ async function freePort() {
 test('[E2E 파이프라인] HTTP 요청 접수 → SQLite/아카이브 저장 → 컨트랙트 앵커링 → 독립 RPC 감사 및 공격 탐지', { timeout: 30000 }, async t => {
   const port = await freePort(), url = `http://127.0.0.1:${port}`;
   const anvil = spawn('anvil', ['--host', '127.0.0.1', '--port', String(port), '--silent'], { stdio: 'ignore' });
-  t.after(async () => { if (anvil.exitCode === null) { anvil.kill(); await once(anvil, 'exit'); } });
+  let spawnError; anvil.on('error', error => { spawnError = error; });
+  const abort = () => { void stopProcess(anvil).catch(() => {}); };
+  t.signal.addEventListener('abort', abort, { once: true });
+  t.after(async () => { t.signal.removeEventListener('abort', abort); await stopProcess(anvil); });
   const rpc = jsonRpc(url, { timeoutMs: 500 });
   let started = false;
-  for (let i = 0; i < 100; i++) { try { await rpc('eth_chainId', []); started = true; break; } catch { await new Promise(r => setTimeout(r, 50)); } }
+  const startupDeadline = Date.now() + 5000;
+  for (let i = 0; i < 100 && Date.now() < startupDeadline; i++) {
+    t.signal.throwIfAborted();
+    if (spawnError) throw spawnError;
+    assert(anvil.exitCode === null && anvil.signalCode === null, 'Anvil exited during startup');
+    try { await rpc('eth_chainId', []); started = true; break; } catch { await new Promise(r => setTimeout(r, 50)); } }
   assert(started, 'local chain started');
   const account = mnemonicToAccount('test test test test test test test test test test test junk'); // Public Anvil account only.
-  const wallet = createWalletClient({ account, chain: foundry, transport: http(url) });
-  const client = createPublicClient({ chain: foundry, transport: http(url) });
-  const send = async tx => client.waitForTransactionReceipt({ hash: await wallet.sendTransaction(tx) });
+  const transport = () => http(url, { timeout: 2000, retryCount: 0, fetchOptions: { signal: t.signal } });
+  const wallet = createWalletClient({ account, chain: foundry, transport: transport() });
+  const client = createPublicClient({ chain: foundry, pollingInterval: 50, cacheTime: 0, transport: transport() });
+  const waitReceipt = options => client.waitForTransactionReceipt({ ...options, timeout: 5000 });
+  const send = async tx => waitReceipt({ hash: await wallet.sendTransaction(tx) });
   const deploy = async (a, args = []) => {
-    const receipt = await client.waitForTransactionReceipt({ hash: await wallet.deployContract({ abi: a.abi, bytecode: a.bytecode.object, args }) });
+    const receipt = await waitReceipt({ hash: await wallet.deployContract({ abi: a.abi, bytecode: a.bytecode.object, args }) });
     assert.equal(receipt.status, 'success'); return receipt.contractAddress.toLowerCase();
   };
   const anchor = artifact('RecordAnchor'), tokenArtifact = artifact('RecordAnchor.t');
   const anchorAddress = await deploy(anchor, [account.address]), token = await deploy(tokenArtifact);
-  const setBalance = async balance => client.waitForTransactionReceipt({ hash: await wallet.writeContract({ address: token, abi: tokenArtifact.abi,
+  const setBalance = async balance => waitReceipt({ hash: await wallet.writeContract({ address: token, abi: tokenArtifact.abi,
     functionName: 'setBalance', args: [account.address, balance] }) });
   await setBalance(120000000n);
   const f = fixture(), p = f.trust.policy;
@@ -60,10 +71,10 @@ test('[E2E 파이프라인] HTTP 요청 접수 → SQLite/아카이브 저장 �
   const server = createEvidenceServer({ store, reader, writeToken: 'b'.repeat(32), signer: { keyId: 'company', privateKey: f.institution.privateKey } });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   let closed = false;
-  t.after(async () => { if (!closed) { await new Promise(r => server.close(r)); store.close(); } });
+  t.after(async () => { if (!closed) { await closeHttpServer(server); store.close(); } });
   const base = `http://127.0.0.1:${server.address().port}`;
   const post = async (path, data = {}) => {
-    const response = await fetch(`${base}/v3${path}`, { method: 'POST', headers: { authorization: `Bearer ${'b'.repeat(32)}` }, body: canonical(data) });
+    const response = await fetch(`${base}/v3${path}`, { method: 'POST', headers: { authorization: `Bearer ${'b'.repeat(32)}` }, body: canonical(data), signal: AbortSignal.any([t.signal, AbortSignal.timeout(5000)]) });
     const body = await response.json(); assert.equal(response.status, 200, canonical(body)); return body;
   };
   const request = created => requestRecord({ ...scope(p), requesterId: 'alice', institutionId: p.institutionId,
@@ -96,7 +107,7 @@ test('[E2E 파이프라인] HTTP 요청 접수 → SQLite/아카이브 저장 �
   await assert.rejects(verifyOne(bundle, f.trust, flakyView), /RPC_UNAVAILABLE/);
   assert.equal((await verifyOne(bundle, f.trust, flakyView)).ok, true, 'failed RPC results are not cached');
   // Stop the service and remove the working DB: the archived evidence remains sufficient.
-  await new Promise(r => server.close(r)); store.close(); closed = true;
+  await closeHttpServer(server); store.close(); closed = true;
   unlinkSync(join(dir, 'records.sqlite'));
   assert.equal((await auditAll(archive, f.trust, await auditor.at('latest'))).ok, true);
   const original = readFileSync(archive.path('batch', '2'), 'utf8');
@@ -110,11 +121,11 @@ test('[E2E 파이프라인] HTTP 요청 접수 → SQLite/아카이브 저장 �
   const wrong = structuredClone(bundle.decision.record);
   wrong.decision = sign('decision-v3', 'company', { ...wrong.decision.payload, outcome: 'APPROVED', reason: 'POLICY_SATISFIED' }, f.institution.privateKey);
   const tree = buildTree([wrong]); archive.put('batch', '3', [wrong]);
-  await client.waitForTransactionReceipt({ hash: await wallet.writeContract({ address: anchorAddress, abi: anchor.abi, functionName: 'anchorBatch', args: [3n, tree.root, 1n] }) });
+  await waitReceipt({ hash: await wallet.writeContract({ address: anchorAddress, abi: anchor.abi, functionName: 'anchorBatch', args: [3n, tree.root, 1n] }) });
   const conflict = await auditAll(archive, f.trust, await auditor.at('latest'));
   assert(conflict.issues.some(i => i.code === 'POLICY_MISMATCH')); assert(conflict.issues.some(i => i.code === 'CONFLICTING_DECISIONS'));
   const missing = request('3'); archive.put('batch', '4', [missing]);
-  await client.waitForTransactionReceipt({ hash: await wallet.writeContract({ address: anchorAddress, abi: anchor.abi, functionName: 'anchorBatch', args: [4n, buildTree([missing]).root, 1n] }) });
+  await waitReceipt({ hash: await wallet.writeContract({ address: anchorAddress, abi: anchor.abi, functionName: 'anchorBatch', args: [4n, buildTree([missing]).root, 1n] }) });
   await rpc('evm_increaseTime', [91]); await rpc('evm_mine', []);
   const expired = await auditAll(archive, f.trust, await auditor.at('latest'));
   assert.equal(expired.requests.find(r => r.requestId === missing.requestId).timing, 'MISSING_AS_OF_H');

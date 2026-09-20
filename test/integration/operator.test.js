@@ -14,19 +14,20 @@ import {mnemonicToAccount} from 'viem/accounts';
 import {startAuditServer} from '../../src/demo/audit-server.js';
 import {Operator} from '../../src/operator/run.js';
 import {canonical} from '../../src/v3/crypto.js';
+import {stopProcess} from '../../scripts/local-process.js';
 
 test('[오퍼레이터 데몬] 복수 요청 처리, 상태 재생, 프로세스 재시작 시 중복 배치 없이 안정적 복구', {timeout:60000}, async t=>{
  const socket=createServer();socket.listen(0,'127.0.0.1');await once(socket,'listening');const port=socket.address().port;await new Promise(r=>socket.close(r));
  const rpcUrl=`http://127.0.0.1:${port}`,anvil=spawn('anvil',['--port',String(port),'--silent'],{stdio:'ignore'});
  const dir=mkdtempSync(join(tmpdir(),'trust404-op-'));let op;
- t.after(()=>{op?.close();anvil.kill();rmSync(dir,{recursive:true,force:true});});
+ t.after(async()=>{op?.close();await stopProcess(anvil);rmSync(dir,{recursive:true,force:true});});
  const config={rpcUrl,chain:foundry,token:'0x0000000000000000000000000000000000000001'};
  op=new Operator(dir,config);const identity=op.init();
  for(let i=0;i<50;i++){try{await op.client.getBlockNumber();break;}catch{await new Promise(r=>setTimeout(r,100));}}
  await op.client.request({method:'anvil_setBalance',params:[identity.address,'0xde0b6b3a7640000']});
  const account=mnemonicToAccount('test test test test test test test test test test test junk');const wallet=createWalletClient({account,chain:foundry,transport:http(rpcUrl)});
  const token=JSON.parse(readFileSync('out/RecordAnchor.t.sol/TestToken.json'));
- const receipt=await op.client.waitForTransactionReceipt({hash:await wallet.deployContract({abi:token.abi,bytecode:token.bytecode.object})});config.token=receipt.contractAddress.toLowerCase();
+ const receipt=await op.client.waitForTransactionReceipt({timeout:5000,hash:await wallet.deployContract({abi:token.abi,bytecode:token.bytecode.object})});config.token=receipt.contractAddress.toLowerCase();
  await op.deploy();op.open();
  for(let i=1;i<=2;i++)op.request('50000000',`request${i}`);
  await op.submit('50000000','request3');

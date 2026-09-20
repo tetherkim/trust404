@@ -13,7 +13,8 @@ export class RpcRuntimeAdapter {
   constructor({ rpcUrl, chainId = 31337 } = {}) {
     this.rpcUrl = rpcUrl;
     this.chainId = chainId;
-    this.client = createPublicClient({ transport: http(rpcUrl) });
+    this.client = createPublicClient({ transport: http(rpcUrl),
+      ...(chainId === 31337 ? { pollingInterval: 50, cacheTime: 0 } : {}) });
   }
 
   /**
@@ -96,7 +97,7 @@ export class RpcRuntimeAdapter {
     });
 
     // Wait for settlement
-    const receipt = await this.client.waitForTransactionReceipt({ hash });
+    const receipt = await this.client.waitForTransactionReceipt({ hash, timeout: 5000 });
     check(receipt.status === 'success', 'ANCHOR_TRANSACTION_FAILED');
 
     return {

@@ -6,10 +6,19 @@ import { join } from 'node:path';
 import { get } from 'node:http';
 import { startDemo } from '../../src/demo/local.js';
 
+test('시연 준비 중 취소하면 Anvil 정리를 마치고 중단 사유를 반환한다', { timeout: 10000 }, async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'trust404-demo-abort-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const controller = new AbortController(), reason = new Error('DEMO_CANCELLED');
+  await assert.rejects(startDemo({ port: 0, directory, signal: controller.signal,
+    report: () => controller.abort(reason), profileFile: null, deploymentPublisher: null }), error => error === reason);
+});
+
 test('[로컬 시연] 실제 레코드 생성 및 5가지 시나리오(정상 거절, 변조, 유실, 미등록, 불일치) 독립 탐지 검증', { timeout: 30000 }, async t => {
   const directory = mkdtempSync(join(tmpdir(), 'trust404-demo-test-'));
-  const demo = await startDemo({ port: 0, directory, deploymentPublisher: '0xcfFb0eEd0e42876470Af1451BC3d4e3F865bB987' });
-  t.after(async () => { await demo.close(); rmSync(directory, { recursive: true, force: true }); });
+  let demo;
+  t.after(async () => { await demo?.close(); rmSync(directory, { recursive: true, force: true }); });
+  demo = await startDemo({ port: 0, directory, signal: t.signal, report: message => t.diagnostic(message), deploymentPublisher: '0xcfFb0eEd0e42876470Af1451BC3d4e3F865bB987' });
   const status = await (await fetch(`${demo.url}/api/status`)).json();
   assert.equal(status.aomiConnected, false); assert.equal(status.chainId, 31337); assert.equal(status.scenarios.length, 5);
   const results = {};

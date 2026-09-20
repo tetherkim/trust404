@@ -18,7 +18,8 @@ export class Operator {
     mkdirSync(this.dir,{recursive:true,mode:0o700});
     const lock=join(this.dir,'operator.lock');
     const fd=openSync(lock,'wx',0o600);writeFileSync(fd,String(process.pid));closeSync(fd);this.lock=lock;
-    this.client=createPublicClient({transport:http(config.rpcUrl),chain:config.chain});
+    this.client=createPublicClient({transport:http(config.rpcUrl),chain:config.chain,
+      ...(config.chain.id===31337?{pollingInterval:50,cacheTime:0}:{})});
   }
   load(name){return JSON.parse(readFileSync(join(this.dir,name),'utf8'));}
   has(name){return existsSync(join(this.dir,name));}
