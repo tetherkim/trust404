@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 let input, profiles = [], busy = false, generation = 0;
-let deployment, connectedWallet;
+let deployment, connectedWallet, metamask;
 const labels = {
   VERIFIED: '검증 완료', FINDING: '이상 탐지', INCONCLUSIVE: '판정 불가', RUNNING: '검증 중', ERROR: '오류',
   COMPLETE: '완전', INCOMPLETE: '불완전', FINALIZED: '확정', PROVISIONAL: '확정 대기',
@@ -74,7 +74,23 @@ fetch('/api/profiles').then(async response => {
   ready();
 }).catch(error => { $('load-error').textContent = error.message; });
 
-const walletProvider = () => window.phantom?.ethereum ?? window.ethereum;
+const isMetaMask = provider => provider?.isMetaMask && !provider?.isPhantom;
+const rememberMetaMask = provider => {
+  if (!metamask && isMetaMask(provider)) {
+    metamask = provider;
+    provider.on?.('accountsChanged', accounts => { connectedWallet = accounts?.[0]; updateDeployment(); });
+    provider.on?.('chainChanged', updateDeployment);
+    provider.request({ method: 'eth_accounts' }).then(accounts => { connectedWallet = accounts?.[0]; updateDeployment(); }).catch(() => {});
+    updateDeployment();
+  }
+};
+window.addEventListener('eip6963:announceProvider', event => {
+  if (event.detail?.info?.rdns === 'io.metamask' || isMetaMask(event.detail?.provider)) rememberMetaMask(event.detail.provider);
+});
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+for (const provider of window.ethereum?.providers ?? []) rememberMetaMask(provider);
+rememberMetaMask(window.ethereum);
+const walletProvider = () => metamask;
 const waitForReceipt = async (provider, transactionHash) => {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [transactionHash] });
@@ -91,8 +107,8 @@ function updateDeployment() {
   const provider = walletProvider();
   $('connect-wallet').disabled = !provider;
   $('deploy-contract').disabled = !connectedWallet || connectedWallet.toLowerCase() !== deployment.publisher;
-  if (!provider) $('deploy-state').textContent = '이 브라우저에서 EVM 지갑 확장 프로그램을 찾지 못했습니다.';
-  else if (!connectedWallet) $('deploy-state').textContent = '배포 권한자 지갑을 연결해 주세요.';
+  if (!provider) $('deploy-state').textContent = '이 브라우저에서 MetaMask 확장 프로그램을 찾지 못했습니다.';
+  else if (!connectedWallet) $('deploy-state').textContent = 'MetaMask에서 배포 권한자 계정을 연결해 주세요.';
   else if (connectedWallet.toLowerCase() !== deployment.publisher) $('deploy-state').textContent = `연결 주소 불일치: ${connectedWallet}`;
   else $('deploy-state').textContent = `서명 준비 완료 · ${connectedWallet}`;
 }
@@ -104,7 +120,7 @@ async function requireBaseSepolia(provider) {
 $('connect-wallet').addEventListener('click', async () => {
   try {
     const provider = walletProvider();
-    if (!provider) throw new Error('EVM 지갑 확장 프로그램이 없습니다.');
+    if (!provider) throw new Error('MetaMask 확장 프로그램이 없습니다.');
     const accounts = await provider.request({ method: 'eth_requestAccounts' });
     connectedWallet = accounts?.[0]; await requireBaseSepolia(provider); updateDeployment();
   } catch (error) { $('deploy-state').textContent = `지갑 연결 실패: ${error.message}`; }
