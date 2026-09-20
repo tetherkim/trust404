@@ -156,7 +156,7 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
       for (const config of JSON.parse(readFileSync(profileFile, 'utf8'))) {
         const trust = JSON.parse(readFileSync(resolve(root, config.trustFile), 'utf8'));
         check(!profiles.has(trust.policyHash), 'DUPLICATE_TRUST_PROFILE');
-        profiles.set(trust.policyHash, { trust, rpcUrl: config.rpcUrl, label: config.label ?? trust.policy.logId });
+        profiles.set(trust.policyHash, { trust, rpcUrl: config.rpcUrl, asOf: config.asOf ?? 'finalized', label: config.label ?? trust.policy.logId });
       }
     }
     const index = readFileSync(new URL('./index.html', import.meta.url));

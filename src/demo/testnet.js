@@ -35,7 +35,7 @@ if(!existsSync(join(directory,'request.json'))) {
     recipient:p.treasury,amountAtomic:'50000000',createdAtMs:String(Date.now()),policyHash:trust.policyHash},'requester',keys.requester));
 }
 const request=load('request.json'); store.submit(request);
-save('profiles.json',[{trustFile:join(directory,'trust.json'),rpcUrl,label:'Base Sepolia / 실제 등록 기록'}]);
+save('profiles.json',[{trustFile:join(directory,'trust.json'),rpcUrl,asOf:'latest',label:'Base Sepolia / 확정 대기 기록'}]);
 let locked=false;
 async function advance() {
   check(!locked,'OPERATION_IN_PROGRESS'); locked=true;
