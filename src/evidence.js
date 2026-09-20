@@ -1,12 +1,12 @@
 import {
   createHash,
-  generateKeyPairSync,
+  createPublicKey,
   sign as cryptoSign,
   verify as cryptoVerify
 } from 'node:crypto';
 import {
   verifyInclusions,
-  checkedLog,
+  verifyLogRecords,
   leafHash,
   payloadHash,
   safeNumber
@@ -60,7 +60,7 @@ export function sign(domain, payload, key) {
   };
 }
 
-function signature(envelope, domain, key) {
+function verifySignature(envelope, domain, key) {
   requireThat(
     envelope?.domain === domain && typeof envelope.signature === 'string',
     'INVALID_ENVELOPE'
@@ -80,7 +80,7 @@ function signature(envelope, domain, key) {
   return envelope.payload;
 }
 
-function fields(object, keys) {
+function assertFields(object, keys) {
   requireThat(
     object && Object.getPrototypeOf(object) === Object.prototype,
     'INVALID_SCHEMA'
@@ -91,7 +91,7 @@ function fields(object, keys) {
 }
 
 export function validatePolicy(policy) {
-  fields(policy, ['version', 'id', 'institution', 'currency', 'limit', 'decisionWindow']);
+  assertFields(policy, ['version', 'id', 'institution', 'currency', 'limit', 'decisionWindow']);
   requireThat(
     policy.version === 1
     && policy.id === 'per-transfer-limit-v1'
@@ -103,9 +103,9 @@ export function validatePolicy(policy) {
   );
 }
 
-export function requestPayload(envelope, trust) {
-  const r = signature(envelope, 'request', trust.customerKey);
-  fields(r, ['version', 'id', 'customer', 'institution', 'amount', 'currency', 'policyHash']);
+export function verifyRequestEnvelope(envelope, verificationContext) {
+  const r = verifySignature(envelope, 'request', verificationContext.customerKey);
+  assertFields(r, ['version', 'id', 'customer', 'institution', 'amount', 'currency', 'policyHash']);
   requireThat(
     r.version === 1
     && typeof r.id === 'string'
@@ -114,9 +114,9 @@ export function requestPayload(envelope, trust) {
   );
   requireThat(
     r.customer === 'demo-customer'
-    && r.institution === trust.policy.institution
+    && r.institution === verificationContext.policy.institution
     && r.currency === 'KRW'
-    && r.policyHash === hash(trust.policy),
+    && r.policyHash === hash(verificationContext.policy),
     'REQUEST_CONTEXT_MISMATCH'
   );
   requireThat(Number.isSafeInteger(r.amount) && r.amount > 0, 'INVALID_AMOUNT');
@@ -124,23 +124,43 @@ export function requestPayload(envelope, trust) {
   return r;
 }
 
-export function expectedDecision(r) {
+export function evaluateRequest(r) {
   return r.amount > 1000000
     ? { outcome: 'REJECTED', reason: 'LIMIT_EXCEEDED' }
     : { outcome: 'APPROVED', reason: 'WITHIN_LIMIT' };
 }
 
-export function decisionPayload(envelope, request, trust) {
-  const d = signature(envelope, 'decision', trust.institutionKey);
-  fields(d, ['version', 'requestHash', 'policyHash', 'outcome', 'reason']);
+export function createRequest({ id, amount, policy, customerPrivateKey }) {
+  const policySnapshot = structuredClone(policy);
+  validatePolicy(policySnapshot);
+  const payload = {
+    version: 1,
+    id,
+    customer: 'demo-customer',
+    institution: policySnapshot.institution,
+    amount,
+    currency: 'KRW',
+    policyHash: hash(policySnapshot)
+  };
+  const envelope = sign('request', payload, customerPrivateKey);
+  verifyRequestEnvelope(envelope, {
+    policy: policySnapshot,
+    customerKey: createPublicKey(customerPrivateKey)
+  });
+  return structuredClone(envelope);
+}
+
+export function verifyDecisionEnvelope(envelope, request, verificationContext) {
+  const d = verifySignature(envelope, 'decision', verificationContext.institutionKey);
+  assertFields(d, ['version', 'requestHash', 'policyHash', 'outcome', 'reason']);
   requireThat(
     d.version === 1
     && d.requestHash === hash(request)
-    && d.policyHash === hash(trust.policy),
+    && d.policyHash === hash(verificationContext.policy),
     'DECISION_CONTEXT_MISMATCH'
   );
 
-  const expected = expectedDecision(request.payload);
+  const expected = evaluateRequest(request.payload);
   requireThat(d.outcome === expected.outcome && d.reason === expected.reason, 'POLICY_MISMATCH');
   return d;
 }
@@ -171,30 +191,30 @@ export function decodePayload(bytes, record) {
   return envelope;
 }
 
-function receiptPayload(bundle, trust) {
+function verifyRequestEvidence(bundle, verificationContext) {
   requireThat(bundle?.request, 'MISSING_EVIDENCE');
   const inclusion = {
     entry: bundle.request.entry?.record,
     proof: bundle.request.proof
   };
-  const { entries: records } = verifyInclusions([inclusion], bundle.checkpointId, trust);
+  const { entries: records } = verifyInclusions([inclusion], bundle.checkpointId, verificationContext);
   const [record] = records;
   requireThat(record.kind === 0n, 'EXPECTED_REQUEST');
   const envelope = decodePayload(bundle.request.entry.payloadBytes, record);
-  const r = requestPayload(envelope, trust);
+  const r = verifyRequestEnvelope(envelope, verificationContext);
   return { record, envelope, request: r };
 }
 
-export function verifyReceipt(bundle, trust) {
-  const { record, request: r } = receiptPayload(bundle, trust);
+export function verifyReceipt(bundle, verificationContext) {
+  const { record, request: r } = verifyRequestEvidence(bundle, verificationContext);
   return { ok: true, requestId: r.id, index: safeNumber(record.index) };
 }
 
-export function verifySingle(bundle, trust) {
+export function verifySingle(bundle, verificationContext) {
   requireThat(bundle?.request && bundle.decision, 'MISSING_EVIDENCE');
   const items = [bundle.request, bundle.decision];
   const inclusions = items.map(item => ({ entry: item.entry?.record, proof: item.proof }));
-  const { entries: records } = verifyInclusions(inclusions, bundle.checkpointId, trust);
+  const { entries: records } = verifyInclusions(inclusions, bundle.checkpointId, verificationContext);
   const [requestRecord, decisionRecord] = records;
   const [requestEnvelope, decisionEnvelope] = items.map((item, index) =>
     decodePayload(item.entry.payloadBytes, records[index]));
@@ -206,8 +226,8 @@ export function verifySingle(bundle, trust) {
     'DECISION_LINK_MISMATCH'
   );
 
-  const r = requestPayload(requestEnvelope, trust);
-  const d = decisionPayload(decisionEnvelope, requestEnvelope, trust);
+  const r = verifyRequestEnvelope(requestEnvelope, verificationContext);
+  const d = verifyDecisionEnvelope(decisionEnvelope, requestEnvelope, verificationContext);
   requireThat(
     requestRecord.recordedAt <= decisionRecord.recordedAt,
     'INVALID_EVENT_ORDER'
@@ -222,10 +242,10 @@ export function verifySingle(bundle, trust) {
   };
 }
 
-export function audit(entries, trust) {
+export function audit(entries, verificationContext) {
   requireThat(Array.isArray(entries), 'LOG_SIZE_MISMATCH');
   const rawRecords = entries.map(entry => entry.record);
-  const { checkpointInfo: info, entries: records } = checkedLog(rawRecords, trust);
+  const { checkpointInfo: info, entries: records } = verifyLogRecords(rawRecords, verificationContext);
 
   const requests = new Map();
   const reqIds = new Set();
@@ -236,14 +256,14 @@ export function audit(entries, trust) {
     const envelope = decodePayload(entry.payloadBytes, record);
 
     if (record.kind === 0n) {
-      requireThat(record.actor.toLowerCase() === trust.customerAddress.toLowerCase(), 'ACTOR_MISMATCH');
-      const r = requestPayload(envelope, trust);
+      requireThat(record.actor.toLowerCase() === verificationContext.institutionAddress.toLowerCase(), 'ACTOR_MISMATCH');
+      const r = verifyRequestEnvelope(envelope, verificationContext);
       requireThat(!reqIds.has(r.id), 'DUPLICATE_REQUEST');
       reqIds.add(r.id);
       requests.set(record.index, { record, envelope });
     } else {
       const key = record.requestIndex;
-      decisionPayload(envelope, requests.get(key).envelope, trust);
+      verifyDecisionEnvelope(envelope, requests.get(key).envelope, verificationContext);
       decisions.add(key);
     }
   });
@@ -253,7 +273,7 @@ export function audit(entries, trust) {
   for (const [key, request] of requests) {
     if (decisions.has(key)) continue;
 
-    const deadline = request.record.recordedAt + BigInt(trust.policy.decisionWindow);
+    const deadline = request.record.recordedAt + BigInt(verificationContext.policy.decisionWindow);
     const id = request.envelope.payload.id;
     if (info.checkpoint.issuedAt >= deadline) {
       overdue.push(id);
@@ -271,41 +291,70 @@ export function audit(entries, trust) {
   };
 }
 
-export function createSystem({
-  witness,
+export function buildBundle(entries, request, decision, verificationContext) {
+  const list = entries.slice(0, safeNumber(verificationContext.checkpoint.size));
+  const rawRecords = list.map(entry => entry.record);
+  const { checkpointInfo: info, tree } = verifyLogRecords(rawRecords, verificationContext);
+  const item = (candidate, kind) => {
+    requireThat(candidate?.record, 'MISSING_EVIDENCE');
+    const index = safeNumber(candidate.record.index);
+    const entry = list[index];
+    requireThat(
+      entry && BigInt(entry.record.kind) === kind,
+      'EVIDENCE_NOT_IN_CHECKPOINT'
+    );
+    const candidateHash = leafHash(candidate.record, verificationContext);
+    const storedHash = leafHash(entry.record, verificationContext);
+    requireThat(candidateHash === storedHash, 'EVIDENCE_NOT_IN_CHECKPOINT');
+    const { payloadBytes, record, checkpointId } = entry;
+    return { entry: { payloadBytes, record, checkpointId }, proof: tree.proof(index) };
+  };
+
+  const result = {
+    checkpointId: info.checkpointId,
+    request: item(request, 0n)
+  };
+  if (decision !== undefined) result.decision = item(decision, 1n);
+  return structuredClone(result);
+}
+
+export function createInstitution({
+  logClient,
+  policy,
+  institutionKeys,
+  customerKey,
   onPayload = () => { },
-  onAppend = () => { },
-  keys = {
-    customer: generateKeyPairSync('ed25519'),
-    institution: generateKeyPairSync('ed25519')
-  }
-} = {}) {
-  const policy = {
-    version: 1,
-    id: 'per-transfer-limit-v1',
-    institution: 'demo-bank',
-    currency: 'KRW',
-    limit: 1000000,
-    decisionWindow: 60
-  };
+  onAppend = () => { }
+}) {
+  const policySnapshot = structuredClone(policy);
+  validatePolicy(policySnapshot);
+  requireThat(typeof customerKey === 'string', 'INVALID_CUSTOMER_KEY');
+  requireThat(institutionKeys?.publicKey && institutionKeys.privateKey, 'INVALID_INSTITUTION_KEYS');
+  const institutionPrivateKey = institutionKeys.privateKey;
   const entries = [];
-  const baseTrust = {
-    chainId: witness.context.chainId,
-    evidenceLogAddress: witness.context.evidenceLogAddress,
-    depth: witness.context.depth,
-    customerAddress: witness.context.customerAddress,
-    institutionAddress: witness.context.institutionAddress,
-    policy,
-    customerKey: keys.customer.publicKey.export({ type: 'spki', format: 'pem' }),
-    institutionKey: keys.institution.publicKey.export({ type: 'spki', format: 'pem' })
+  const baseVerificationContext = {
+    chainId: logClient.context.chainId,
+    evidenceLogAddress: logClient.context.evidenceLogAddress,
+    depth: logClient.context.depth,
+    institutionAddress: logClient.context.institutionAddress,
+    policy: policySnapshot,
+    customerKey,
+    institutionKey: institutionKeys.publicKey.export({ type: 'spki', format: 'pem' })
   };
+
+  function withRegistration(error, registration) {
+    const snapshot = structuredClone(registration);
+    error.txHash ??= snapshot.txHash;
+    error.registration = snapshot;
+    return error;
+  }
 
   async function register(evidence, send) {
-    const bytes = encodePayload(evidence);
     const envelopeSnapshot = structuredClone(evidence);
-    await onPayload(bytes, envelopeSnapshot);
+    const bytes = encodePayload(envelopeSnapshot);
+    await onPayload(bytes, structuredClone(envelopeSnapshot));
 
-    const registration = await send(bytes);
+    const registration = structuredClone(await send(bytes));
     try {
       const record = registration.entry;
       const entry = {
@@ -317,36 +366,30 @@ export function createSystem({
       const entriesSnapshot = structuredClone(updatedEntries);
       await onAppend(entriesSnapshot);
       entries.push(entry);
-      return entry;
+      return { entry: structuredClone(entry), registration };
     } catch (error) {
-      error.txHash = registration.txHash;
-      error.registration = registration;
-      throw error;
+      throw withRegistration(error, registration);
     }
   }
 
-  async function submit(id, amount) {
-    const payload = {
-      version: 1,
-      id,
-      customer: 'demo-customer',
-      institution: policy.institution,
-      amount,
-      currency: 'KRW',
-      policyHash: hash(policy)
-    };
-    const envelope = sign('request', payload, keys.customer.privateKey);
-    requestPayload(envelope, baseTrust);
+  async function accept(envelope) {
+    envelope = structuredClone(envelope);
+    const request = verifyRequestEnvelope(envelope, baseVerificationContext);
 
     const hasDuplicateRequest = entries.some(e => {
       if (BigInt(e.record.kind) !== 0n) return false;
-      if (e.record.actor.toLowerCase() !== baseTrust.customerAddress.toLowerCase()) return false;
 
       const existingEnvelope = decodePayload(e.payloadBytes, e.record);
-      return existingEnvelope.payload.id === id;
+      return existingEnvelope.payload.id === request.id;
     });
     requireThat(!hasDuplicateRequest, 'DUPLICATE_REQUEST');
-    return register(envelope, bytes => witness.registerRequest(bytes));
+    const registered = await register(envelope, bytes => logClient.registerRequest(bytes));
+    try {
+      const verificationContext = await getVerificationContext(registered.entry.checkpointId);
+      return buildBundle(entries, registered.entry, undefined, verificationContext);
+    } catch (error) {
+      throw withRegistration(error, registered.registration);
+    }
   }
 
   async function decide(receipt) {
@@ -355,12 +398,11 @@ export function createSystem({
       'MISSING_EVIDENCE'
     );
     const evidence = structuredClone(receipt);
-    const anchor = await trust(evidence.checkpointId);
-    const { record, envelope, request: r } = receiptPayload(evidence, anchor);
+    const verificationContext = await getVerificationContext(evidence.checkpointId);
+    const { record, envelope, request: r } = verifyRequestEvidence(evidence, verificationContext);
 
     const hasDuplicateRequest = entries.some(e => {
       if (BigInt(e.record.kind) !== 0n) return false;
-      if (e.record.actor.toLowerCase() !== baseTrust.customerAddress.toLowerCase()) return false;
 
       const existingEnvelope = decodePayload(e.payloadBytes, e.record);
       if (existingEnvelope.payload.id !== r.id) return false;
@@ -374,66 +416,47 @@ export function createSystem({
       return BigInt(e.record.requestIndex) === BigInt(record.index);
     });
     requireThat(!hasDuplicateDecision, 'DUPLICATE_DECISION');
+    buildBundle(entries, evidence.request.entry, undefined, verificationContext);
 
     const payload = {
       version: 1,
       requestHash: hash(envelope),
-      policyHash: hash(policy),
-      ...expectedDecision(r)
+      policyHash: hash(policySnapshot),
+      ...evaluateRequest(r)
     };
-    const decision = sign('decision', payload, keys.institution.privateKey);
-    return register(decision, bytes => witness.registerDecision(record.index, bytes));
+    const decisionEnvelope = sign('decision', payload, institutionPrivateKey);
+    const registered = await register(
+      decisionEnvelope,
+      bytes => logClient.registerDecision(record.index, bytes)
+    );
+    try {
+      const decisionVerificationContext = await getVerificationContext(registered.entry.checkpointId);
+      return buildBundle(entries, evidence.request.entry, registered.entry, decisionVerificationContext);
+    } catch (error) {
+      throw withRegistration(error, registered.registration);
+    }
   }
 
-  async function trust(checkpointId) {
-    if (checkpointId === undefined) {
-      checkpointId = (await witness.checkpoint()).checkpointId;
-    }
-    const anchor = await witness.readCheckpoint(checkpointId);
-    return {
-      ...baseTrust,
-      checkpointId: anchor.checkpointId,
-      checkpoint: anchor.checkpoint
-    };
+  async function getVerificationContext(checkpointId) {
+    requireThat(checkpointId !== undefined && checkpointId !== null, 'CHECKPOINT_REQUIRED');
+    const selectedCheckpoint = await logClient.readCheckpoint(checkpointId);
+    return structuredClone({
+      ...baseVerificationContext,
+      checkpointId: selectedCheckpoint.checkpointId,
+      checkpoint: selectedCheckpoint.checkpoint
+    });
   }
 
-  const bundle = (request, decision, trust) => {
-    const list = entries.slice(0, safeNumber(trust.checkpoint.size));
-    const rawRecords = list.map(entry => entry.record);
-    const { checkpointInfo: info, tree } = checkedLog(rawRecords, trust);
-    const item = (candidate, kind) => {
-      requireThat(candidate?.record, 'MISSING_EVIDENCE');
-      const index = safeNumber(candidate.record.index);
-      const entry = list[index];
-      requireThat(
-        entry && BigInt(entry.record.kind) === kind,
-        'EVIDENCE_NOT_IN_CHECKPOINT'
-      );
-      const candidateHash = leafHash(candidate.record, baseTrust);
-      const storedHash = leafHash(entry.record, baseTrust);
-      requireThat(candidateHash === storedHash, 'EVIDENCE_NOT_IN_CHECKPOINT');
-      const { payloadBytes, record, checkpointId } = entry;
-      return { entry: { payloadBytes, record, checkpointId }, proof: tree.proof(index) };
-    };
-
-    const result = {
-      checkpointId: info.checkpointId,
-      request: item(request, 0n)
-    };
-    if (decision !== undefined) {
-      result.decision = item(decision, 1n);
-    }
-
-    return structuredClone(result);
-  };
+  async function exportLog(checkpointId) {
+    requireThat(checkpointId !== undefined && checkpointId !== null, 'CHECKPOINT_REQUIRED');
+    const { checkpoint } = await logClient.readCheckpoint(checkpointId);
+    return structuredClone(entries.slice(0, safeNumber(checkpoint.size)));
+  }
 
   return {
-    keys,
-    entries,
-    policy,
-    submit,
+    accept,
     decide,
-    trust,
-    bundle,
+    getVerificationContext,
+    exportLog
   };
 }

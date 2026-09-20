@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
-  AbiCoder, ContractFactory, Interface, JsonRpcProvider, TransactionResponse,
+  AbiCoder, Contract, ContractFactory, Interface, JsonRpcProvider, TransactionResponse,
   ZeroHash, concat, getAddress, keccak256, toUtf8Bytes,
 } from 'ethers';
 import {
-  buildTree, checkedLog, checkpointInfo, createEvmWitness,
-  deployEvmWitness, verifyInclusions, leafHash, payloadHash, readRecord, safeNumber,
+  buildTree, verifyLogRecords, checkpointInfo, checkEvmContext, createEvmLogClient,
+  deployEvmWitness, verifyInclusions, leafHash, payloadHash, readCheckpoint, readRecord, safeNumber,
 } from '../src/evm.js';
 
 const artifact = JSON.parse(await readFile(new URL('../contracts/out/EvidenceLog.sol/EvidenceLog.json', import.meta.url), 'utf8'));
@@ -21,17 +21,17 @@ const pair = (a, b) => keccak256(concat([a, b].sort()));
 const disk = value => JSON.parse(JSON.stringify(value, (_, item) => typeof item === 'bigint' ? item.toString() : item));
 const context = {
   chainId: 31337n, evidenceLogAddress: EVIDENCE_LOG, depth: 6, deploymentBlock: 10n,
-  customerAddress: CUSTOMER, institutionAddress: INSTITUTION,
+  institutionAddress: INSTITUTION,
 };
 const payloadBytes = '0x00ff80';
 const requestEntry = {
-  index: 0n, kind: 0n, actor: CUSTOMER, requestIndex: 0n, payloadHash: payloadHash(payloadBytes), recordedAt: 1011n,
+  index: 0n, kind: 0n, actor: INSTITUTION, requestIndex: 0n, payloadHash: payloadHash(payloadBytes), recordedAt: 1011n,
 };
 const decisionEntry = {
   index: 1n, kind: 1n, actor: INSTITUTION, requestIndex: 0n, payloadHash: payloadHash('0xabcd'), recordedAt: 1012n,
 };
 
-function trustFor(entries, changes = {}) {
+function verificationContextFor(entries, changes = {}) {
   const ctx = { ...context, ...changes };
   return {
     ...ctx, checkpointId: BigInt(entries.length),
@@ -109,7 +109,7 @@ function fixture({ seeded = true } = {}) {
   const receipt = seeded ? record(requestEntry) : deployment;
   return {
     evidenceLog, provider, customerSigner, institutionSigner, record, receipt, deployment,
-    entries, receipts, checkpoints, blocks, calls, trust: { ...context },
+    entries, receipts, checkpoints, blocks, calls, context: { ...context },
   };
 }
 
@@ -127,49 +127,49 @@ test('payload hashing accepts finalized hex bytes without decoding and rejects m
     assert.throws(() => payloadHash(bytes), /INVALID_PAYLOAD_BYTES/);
   }
   const f = fixture();
-  const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-  assert.throws(() => witness.registerRequest('0x0'), /INVALID_PAYLOAD_BYTES/);
-  assert.throws(() => witness.registerDecision(0, '0x0'), /INVALID_PAYLOAD_BYTES/);
+  const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+  assert.throws(() => logClient.registerRequest('0x0'), /INVALID_PAYLOAD_BYTES/);
+  assert.throws(() => logClient.registerDecision(0, '0x0'), /INVALID_PAYLOAD_BYTES/);
   assert.equal(f.calls.length, 0);
 });
 
 test('registration hashes raw bytes and reads bigint metadata from ABI events', async () => {
   const f = fixture({ seeded: false });
-  const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-  const result = await witness.registerRequest(payloadBytes);
-  assert.deepEqual(f.calls, [['registerRequest', payloadHash(payloadBytes), CUSTOMER]]);
+  const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+  const result = await logClient.registerRequest(payloadBytes);
+  assert.deepEqual(f.calls, [['registerRequest', payloadHash(payloadBytes), INSTITUTION]]);
   assert.deepEqual(result.entry, requestEntry);
   assert.equal(result.txHash, digest('tx-1'));
   assert.equal(result.checkpointId, 1n);
   assert.equal(result.blockNumber, 11n);
   assert.equal(result.blockHash, digest('block-11'));
   assert.deepEqual(result.checkpoint, { size: 1n, root: buildTree([requestEntry], context).root, issuedAt: 1011n });
-  const decision = await witness.registerDecision('0', '0xabcd');
+  const decision = await logClient.registerDecision('0', '0xabcd');
   assert.deepEqual(decision.entry, decisionEntry);
   assert.deepEqual(f.calls[1], ['registerDecision', 0n, payloadHash('0xabcd'), INSTITUTION]);
   assert.equal(decision.checkpoint.size, 2n);
-  assert.deepEqual(await readRecord({ ...f.evidenceLog, runner: f.provider }, decision.txHash, f.trust), decision);
+  assert.deepEqual(await readRecord({ ...f.evidenceLog, runner: f.provider }, decision.txHash, f.context), decision);
 });
 
 test('wrong signer fails before contract invocation', async t => {
   for (const [name, change, error] of [
-    ['customer signer', f => { f.evidenceLog.runner.getAddress = async () => OTHER; }, /SIGNER_MISMATCH/],
-    ['provider-only sender', f => { f.evidenceLog.runner = f.provider; }, TypeError],
+    ['institution signer', f => { f.institutionSigner.getAddress = async () => OTHER; }, /SIGNER_MISMATCH/],
+    ['provider-only sender', f => { f.institutionSigner.getAddress = undefined; }, TypeError],
   ]) {
     await t.test(name, async () => {
       const f = fixture();
-      const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
+      const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
       change(f);
-      await assert.rejects(witness.registerRequest(payloadBytes), error);
+      await assert.rejects(logClient.registerRequest(payloadBytes), error);
       assert.equal(f.calls.length, 0);
     });
   }
   const f = fixture();
-  const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
+  const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
   f.institutionSigner.getAddress = async () => CUSTOMER;
-  await assert.rejects(witness.registerDecision(0n, payloadBytes), /SIGNER_MISMATCH/);
+  await assert.rejects(logClient.registerDecision(0n, payloadBytes), /SIGNER_MISMATCH/);
   for (const index of [-1n, 2n ** 256n, Number.MAX_SAFE_INTEGER + 1, null]) {
-    assert.throws(() => witness.registerDecision(index, payloadBytes));
+    assert.throws(() => logClient.registerDecision(index, payloadBytes));
   }
   assert.equal(f.calls.length, 0);
 });
@@ -190,7 +190,7 @@ test('record reads reject unconfirmed receipts, block mismatches and ambiguous e
       const f = fixture();
       const txHash = f.receipt.hash;
       change(f);
-      await assert.rejects(readRecord(f.evidenceLog, txHash, f.trust), error);
+      await assert.rejects(readRecord(f.evidenceLog, txHash, f.context), error);
       assert.equal(f.calls.length, 0);
     });
   }
@@ -200,9 +200,9 @@ test('record reads ignore foreign events and support provider-only connections',
   const f = fixture();
   const extra = f.receipt.logs.map(log => ({ ...log, address: OTHER }));
   f.receipt.logs.push(...extra, { address: EVIDENCE_LOG, topics: [digest('unrelated event')], data: '0x' });
-  const result = await readRecord({ ...f.evidenceLog, runner: f.provider }, f.receipt.hash, f.trust);
+  const result = await readRecord({ ...f.evidenceLog, runner: f.provider }, f.receipt.hash, f.context);
   assert.deepEqual(result.entry, requestEntry);
-  assert.deepEqual(await readRecord(f.evidenceLog, f.deployment.hash, f.trust), {
+  assert.deepEqual(await readRecord(f.evidenceLog, f.deployment.hash, f.context), {
     txHash: f.deployment.hash, entry: null, checkpointId: 0n, checkpoint: f.checkpoints.get(0n),
     blockNumber: 10n, blockHash: f.deployment.blockHash,
   });
@@ -211,7 +211,7 @@ test('record reads ignore foreign events and support provider-only connections',
   f.receipt.hash = upperHash(f.receipt.hash);
   f.receipt.blockHash = upperHash(f.receipt.blockHash);
   f.blocks.get(f.receipt.blockNumber).hash = upperHash(f.blocks.get(f.receipt.blockNumber).hash);
-  assert.deepEqual(await readRecord(f.evidenceLog, f.receipt.hash, f.trust), result);
+  assert.deepEqual(await readRecord(f.evidenceLog, f.receipt.hash, f.context), result);
 });
 
 test('send verifies payload, actor, kind and decision link in returned records', async t => {
@@ -223,8 +223,8 @@ test('send verifies payload, actor, kind and decision link in returned records',
       changeEvent(f.receipts.get(tx.hash), 'EntryRecorded', { actor: OTHER });
       return tx;
     };
-    const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-    await assert.rejects(witness.registerRequest(payloadBytes), /ACTOR_MISMATCH/);
+    const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+    await assert.rejects(logClient.registerRequest(payloadBytes), /ACTOR_MISMATCH/);
   });
 
   for (const [name, changes, error] of [
@@ -242,8 +242,8 @@ test('send verifies payload, actor, kind and decision link in returned records',
         return tx;
       };
       f.evidenceLog.connect = () => contract;
-      const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-      await assert.rejects(witness.registerDecision(0n, '0xabcd'), caught => {
+      const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+      await assert.rejects(logClient.registerDecision(0n, '0xabcd'), caught => {
         assert.match(caught.message, error);
         assert.equal(caught.txHash, digest('tx-2'));
         assert.equal(caught.registrationStatus, 'UNKNOWN');
@@ -262,15 +262,15 @@ test('send verifies payload, actor, kind and decision link in returned records',
     return tx;
   };
   f.evidenceLog.connect = () => contract;
-  const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-  await assert.rejects(witness.registerDecision(0n, '0xabcd'), /REQUEST_LINK_MISMATCH/);
+  const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+  await assert.rejects(logClient.registerDecision(0n, '0xabcd'), /REQUEST_LINK_MISMATCH/);
 });
 
 test('checkpoints are fresh even without new entries and cannot contain an entry', async () => {
   const f = fixture();
-  const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-  const a = await witness.checkpoint();
-  const b = await witness.checkpoint();
+  const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+  const a = await logClient.createCheckpoint();
+  const b = await logClient.createCheckpoint();
   assert.equal(a.entry, null);
   assert.equal(b.entry, null);
   assert.equal(b.checkpointId, a.checkpointId + 1n);
@@ -278,41 +278,45 @@ test('checkpoints are fresh even without new entries and cannot contain an entry
   assert.equal(a.checkpoint.size, 1n);
   assert.equal(a.checkpoint.root, b.checkpoint.root);
   assert(b.checkpoint.issuedAt > a.checkpoint.issuedAt);
-  f.evidenceLog.createCheckpoint = async () => ({ hash: f.receipt.hash, wait: async () => f.receipt });
-  await assert.rejects(witness.checkpoint(), /UNEXPECTED_ENTRY/);
+  const g = fixture();
+  const contract = g.evidenceLog.connect(g.institutionSigner);
+  contract.createCheckpoint = async () => ({ hash: g.receipt.hash, wait: async () => g.receipt });
+  g.evidenceLog.connect = () => contract;
+  const invalid = await createEvmLogClient({ ...g, deploymentBlock: 10n });
+  await assert.rejects(invalid.createCheckpoint(), /UNEXPECTED_ENTRY/);
 });
 
 test('checkpoint reads use contract state by ID without receipts or transactions', async () => {
   const f = fixture();
-  const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
+  const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
   f.provider.getTransactionReceipt = async () => assert.fail('UNEXPECTED_RECEIPT_READ');
   f.receipt.logs = [];
 
   for (const id of [0n, '1']) {
-    const result = await witness.readCheckpoint(id);
+    const result = await logClient.readCheckpoint(id);
     assert.deepEqual(result, { checkpointId: BigInt(id), checkpoint: f.checkpoints.get(BigInt(id)) });
   }
   f.record();
-  const later = await witness.readCheckpoint(2);
+  const later = await logClient.readCheckpoint(2);
   assert.equal(later.checkpoint.root, f.checkpoints.get(1n).root);
   assert(later.checkpoint.issuedAt > f.checkpoints.get(1n).issuedAt);
   assert.deepEqual(f.calls, [['getCheckpoint', 0n], ['getCheckpoint', 1n], ['getCheckpoint', 2n]]);
 
   for (const id of [-1n, 2n ** 256n, Number.MAX_SAFE_INTEGER + 1, null]) {
-    await assert.rejects(witness.readCheckpoint(id));
+    await assert.rejects(logClient.readCheckpoint(id));
   }
   assert.equal(f.calls.length, 3);
-  await assert.rejects(witness.readCheckpoint(999n), /CHECKPOINT_NOT_FOUND/);
+  await assert.rejects(logClient.readCheckpoint(999n), /CHECKPOINT_NOT_FOUND/);
   const failure = new Error('RPC_UNAVAILABLE');
   f.evidenceLog.getCheckpoint = async () => { throw failure; };
-  await assert.rejects(witness.readCheckpoint(1n), error => error === failure);
+  await assert.rejects(logClient.readCheckpoint(1n), error => error === failure);
 });
 
 test('leaf commitments use double Keccak over ABI encoding and bind every metadata field', () => {
   const abi = AbiCoder.defaultAbiCoder();
   const encoded = abi.encode(
     ['uint256', 'address', 'uint256', 'uint8', 'address', 'uint256', 'bytes32', 'uint256'],
-    [31337n, EVIDENCE_LOG, 0n, 0n, CUSTOMER, 0n, requestEntry.payloadHash, 1011n],
+    [31337n, EVIDENCE_LOG, 0n, 0n, INSTITUTION, 0n, requestEntry.payloadHash, 1011n],
   );
   const expected = keccak256(keccak256(encoded));
   assert.equal(leafHash(requestEntry, context), expected);
@@ -388,36 +392,36 @@ test('numeric normalization accepts ethers integer representations and rejects p
   for (const value of [2n ** 53n, `${2n ** 53n}`, 2n ** 256n - 1n]) {
     assert.throws(() => safeNumber(value), /overflow/);
   }
-  const trust = trustFor([requestEntry]);
+  const verificationContext = verificationContextFor([requestEntry]);
   for (const depth of [0, 5, 7, 255, 256]) {
-    assert.throws(() => checkpointInfo({ ...trust, depth }), /INVALID_DEPTH/);
+    assert.throws(() => checkpointInfo({ ...verificationContext, depth }), /INVALID_DEPTH/);
   }
-  assert.throws(() => checkpointInfo({ ...trust, checkpoint: { ...trust.checkpoint, size: 65n } }), /INVALID_CHECKPOINT_SIZE/);
-  assert.throws(() => checkpointInfo({ ...trust, checkpoint: { ...trust.checkpoint, root: '0xab' } }), /INVALID_HASH/);
-  assert.equal(checkpointInfo({ ...trust, checkpoint: { ...trust.checkpoint, size: 64n } }).checkpoint.size, 64n);
+  assert.throws(() => checkpointInfo({ ...verificationContext, checkpoint: { ...verificationContext.checkpoint, size: 65n } }), /INVALID_CHECKPOINT_SIZE/);
+  assert.throws(() => checkpointInfo({ ...verificationContext, checkpoint: { ...verificationContext.checkpoint, root: '0xab' } }), /INVALID_HASH/);
+  assert.equal(checkpointInfo({ ...verificationContext, checkpoint: { ...verificationContext.checkpoint, size: 64n } }).checkpoint.size, 64n);
 });
 
 test('checkpoint metadata normalizes JSON and hash representations without evaluating policy', () => {
-  const trust = trustFor([requestEntry, decisionEntry]);
-  const info = checkpointInfo(trust);
-  assert.deepEqual(checkpointInfo({ ...disk(trust), policy: { deliberately: 'not a policy' } }), info);
+  const verificationContext = verificationContextFor([requestEntry, decisionEntry]);
+  const info = checkpointInfo(verificationContext);
+  assert.deepEqual(checkpointInfo({ ...disk(verificationContext), policy: { deliberately: 'not a policy' } }), info);
   const upperHash = value => `0x${value.slice(2).toUpperCase()}`;
-  assert.deepEqual(checkpointInfo({ ...disk(trust), checkpoint: { ...disk(info.checkpoint), root: upperHash(info.checkpoint.root) } }), info);
+  assert.deepEqual(checkpointInfo({ ...disk(verificationContext), checkpoint: { ...disk(info.checkpoint), root: upperHash(info.checkpoint.root) } }), info);
   assert.deepEqual(Object.keys(info), ['chainId', 'evidenceLogAddress', 'depth', 'checkpointId', 'checkpoint']);
 });
 
-test('complete log checks enforce contract order, actors, links and per-actor request uniqueness', async t => {
+test('complete log checks enforce contract order, institution actors, links and request uniqueness', async t => {
   const entries = [requestEntry, decisionEntry];
-  const trust = trustFor(entries);
-  const result = checkedLog(disk(entries), disk(trust));
+  const verificationContext = verificationContextFor(entries);
+  const result = verifyLogRecords(disk(entries), disk(verificationContext));
   assert.deepEqual(result.entries, entries);
-  assert.equal(result.tree.root, trust.checkpoint.root);
-  assert.deepEqual(checkedLog([], trustFor([])).entries, []);
-  assert.throws(() => checkedLog(null, trust), /LOG_SIZE_MISMATCH/);
-  assert.throws(() => checkedLog(entries.slice(0, 1), trust), /LOG_SIZE_MISMATCH/);
-  assert.throws(() => checkedLog([...entries].reverse(), trust), /INVALID_LOG_ORDER/);
-  assert.throws(() => checkedLog([requestEntry, requestEntry], trust), /INVALID_LOG_ORDER/);
-  assert.throws(() => checkedLog(entries, { ...trust, checkpoint: { ...trust.checkpoint, root: digest('bad root') } }), /LOG_ROOT_MISMATCH/);
+  assert.equal(result.tree.root, verificationContext.checkpoint.root);
+  assert.deepEqual(verifyLogRecords([], verificationContextFor([])).entries, []);
+  assert.throws(() => verifyLogRecords(null, verificationContext), /LOG_SIZE_MISMATCH/);
+  assert.throws(() => verifyLogRecords(entries.slice(0, 1), verificationContext), /LOG_SIZE_MISMATCH/);
+  assert.throws(() => verifyLogRecords([...entries].reverse(), verificationContext), /INVALID_LOG_ORDER/);
+  assert.throws(() => verifyLogRecords([requestEntry, requestEntry], verificationContext), /INVALID_LOG_ORDER/);
+  assert.throws(() => verifyLogRecords(entries, { ...verificationContext, checkpoint: { ...verificationContext.checkpoint, root: digest('bad root') } }), /LOG_ROOT_MISMATCH/);
   for (const [name, list, error] of [
     ['kind', [{ ...requestEntry, kind: 2n }], /INVALID_KIND/],
     ['zero payload', [{ ...requestEntry, payloadHash: ZeroHash }], /ZERO_PAYLOAD_HASH/],
@@ -431,22 +435,22 @@ test('complete log checks enforce contract order, actors, links and per-actor re
     ['duplicate decision', [...entries, { ...decisionEntry, index: 2n }], /INVALID_DECISION_LINK/],
     ['decision links to decision', [...entries, { ...decisionEntry, index: 2n, requestIndex: 1n }], /INVALID_DECISION_LINK/],
   ]) {
-    await t.test(name, () => assert.throws(() => checkedLog(list, trustFor(list)), error));
+    await t.test(name, () => assert.throws(() => verifyLogRecords(list, verificationContextFor(list)), error));
   }
-  const otherCustomer = [...entries, { ...requestEntry, index: 2n, requestIndex: 2n, actor: OTHER, recordedAt: 1012n }];
-  assert.equal(checkedLog(otherCustomer, trustFor(otherCustomer)).entries.length, 3);
+  const otherActor = [...entries, { ...requestEntry, index: 2n, requestIndex: 2n, actor: OTHER, recordedAt: 1012n }];
+  assert.throws(() => verifyLogRecords(otherActor, verificationContextFor(otherActor)), /ACTOR_MISMATCH/);
 });
 
 test('inclusion verification returns normalized raw entries and rejects checkpoint, actor, metadata and proof tampering', () => {
   const entries = [requestEntry, decisionEntry];
-  const trust = trustFor(entries);
-  const checkpointId = trust.checkpointId;
+  const verificationContext = verificationContextFor(entries);
+  const checkpointId = verificationContext.checkpointId;
   const tree = buildTree(entries, context);
   const item = { entry: requestEntry, proof: tree.proof(0) };
   const decision = { entry: decisionEntry, proof: tree.proof(1) };
-  const verified = verifyInclusions(disk([item, decision]), checkpointId.toString(), disk(trust));
+  const verified = verifyInclusions(disk([item, decision]), checkpointId.toString(), disk(verificationContext));
   assert.deepEqual(verified.entries, entries);
-  assert.deepEqual(verified.checkpointInfo, checkpointInfo(trust));
+  assert.deepEqual(verified.checkpointInfo, checkpointInfo(verificationContext));
   for (const change of [
     item => { item.entry.actor = OTHER; }, item => { item.entry.recordedAt = 1010n; },
     item => { item.entry.payloadHash = digest('altered'); }, item => { item.proof.pop(); },
@@ -455,32 +459,31 @@ test('inclusion verification returns normalized raw entries and rejects checkpoi
   ]) {
     const tampered = structuredClone(item);
     change(tampered);
-    assert.throws(() => verifyInclusions([tampered, decision], checkpointId, trust));
+    assert.throws(() => verifyInclusions([tampered, decision], checkpointId, verificationContext));
   }
-  assert.throws(() => verifyInclusions([item, { ...decision, proof: tree.proof(0) }], checkpointId, trust), /INVALID_INCLUSION_PROOF/);
-  assert.throws(() => verifyInclusions([item], checkpointId + 1n, trust), /CHECKPOINT_MISMATCH/);
+  assert.throws(() => verifyInclusions([item, { ...decision, proof: tree.proof(0) }], checkpointId, verificationContext), /INVALID_INCLUSION_PROOF/);
+  assert.throws(() => verifyInclusions([item], checkpointId + 1n, verificationContext), /CHECKPOINT_MISMATCH/);
   for (const [change, error] of [
     [{ chainId: 1n }, /INVALID_INCLUSION_PROOF/],
     [{ evidenceLogAddress: OTHER }, /INVALID_INCLUSION_PROOF/],
     [{ depth: 4 }, /INVALID_DEPTH/],
-    [{ checkpoint: { ...trust.checkpoint, root: digest('forged root') } }, /INVALID_INCLUSION_PROOF/],
-    [{ checkpoint: { ...trust.checkpoint, size: 1n } }, /ENTRY_OUTSIDE_CHECKPOINT/],
-    [{ checkpoint: { ...trust.checkpoint, issuedAt: 0n } }, /ENTRY_OUTSIDE_CHECKPOINT/],
+    [{ checkpoint: { ...verificationContext.checkpoint, root: digest('forged root') } }, /INVALID_INCLUSION_PROOF/],
+    [{ checkpoint: { ...verificationContext.checkpoint, size: 1n } }, /ENTRY_OUTSIDE_CHECKPOINT/],
+    [{ checkpoint: { ...verificationContext.checkpoint, issuedAt: 0n } }, /ENTRY_OUTSIDE_CHECKPOINT/],
   ]) {
-    assert.throws(() => verifyInclusions([item, decision], checkpointId, { ...trust, ...change }), error);
+    assert.throws(() => verifyInclusions([item, decision], checkpointId, { ...verificationContext, ...change }), error);
   }
-  assert.throws(() => verifyInclusions([item], checkpointId, { ...trust, customerAddress: OTHER }), /ACTOR_MISMATCH/);
   assert.throws(
-    () => verifyInclusions([decision], checkpointId, { ...trust, institutionAddress: OTHER }),
+    () => verifyInclusions([decision], checkpointId, { ...verificationContext, institutionAddress: OTHER }),
     /ACTOR_MISMATCH/
   );
   const other = [{ ...requestEntry, actor: OTHER }];
-  const otherTrust = trustFor(other);
-  assert.equal(checkedLog(other, otherTrust).entries.length, 1);
-  assert.throws(() => verifyInclusions([{ entry: other[0], proof: buildTree(other, context).proof(0) }], otherTrust.checkpointId, otherTrust), /ACTOR_MISMATCH/);
-  const singleTrust = trustFor([requestEntry]);
-  const proof = buildTree([requestEntry], singleTrust).proof(0);
-  assert.deepEqual(verifyInclusions([{ entry: requestEntry, proof }], singleTrust.checkpointId, singleTrust).entries, [requestEntry]);
+  const otherVerificationContext = verificationContextFor(other);
+  assert.throws(() => verifyLogRecords(other, otherVerificationContext), /ACTOR_MISMATCH/);
+  assert.throws(() => verifyInclusions([{ entry: other[0], proof: buildTree(other, context).proof(0) }], otherVerificationContext.checkpointId, otherVerificationContext), /ACTOR_MISMATCH/);
+  const singleVerificationContext = verificationContextFor([requestEntry]);
+  const proof = buildTree([requestEntry], singleVerificationContext).proof(0);
+  assert.deepEqual(verifyInclusions([{ entry: requestEntry, proof }], singleVerificationContext.checkpointId, singleVerificationContext).entries, [requestEntry]);
 });
 
 test('broadcast lookup failures recover the submitted hash without resending or reusing a previous hash', async () => {
@@ -496,8 +499,8 @@ test('broadcast lookup failures recover the submitted hash without resending or 
     });
   };
   f.evidenceLog.connect = () => contract;
-  const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-  await assert.rejects(witness.registerDecision(0n, '0xabcd'), error => {
+  const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+  await assert.rejects(logClient.registerDecision(0n, '0xabcd'), error => {
     assert.equal(error.message, 'POST_SEND_LOOKUP_FAILED');
     assert.equal(error.txHash, sentHash);
     assert.notEqual(error.txHash, f.receipt.hash);
@@ -505,7 +508,7 @@ test('broadcast lookup failures recover the submitted hash without resending or 
     return true;
   });
   assert.equal(f.calls.length, 1);
-  assert.deepEqual((await readRecord(contract, sentHash, f.trust)).entry, decisionEntry);
+  assert.deepEqual((await readRecord(contract, sentHash, f.context)).entry, decisionEntry);
   assert.equal(f.calls.length, 1);
 });
 
@@ -522,8 +525,8 @@ test('wait and receipt lookup failures preserve the actual transaction hash', as
         return tx;
       };
       if (stage === 'receipt') f.provider.getTransactionReceipt = async () => { throw new Error('RECEIPT_LOOKUP_FAILED'); };
-      const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-      await assert.rejects(witness.checkpoint(), error => {
+      const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+      await assert.rejects(logClient.createCheckpoint(), error => {
         assert.equal(error.txHash, sentHash);
         assert.equal(error.registrationStatus, 'UNKNOWN');
         return true;
@@ -563,8 +566,8 @@ test('only a matching failed receipt in the current block is FAILED', async t =>
           });
         } };
       };
-      const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-      await assert.rejects(witness.checkpoint(), error => {
+      const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+      await assert.rejects(logClient.createCheckpoint(), error => {
         assert.equal(error.txHash, txHash);
         assert.equal(error.registrationStatus, ['confirmed', 'ethers wait'].includes(scenario) ? 'FAILED' : 'UNKNOWN');
         if (scenario === 'ethers wait') {
@@ -595,8 +598,8 @@ test('unknown no-hash sends stay UNKNOWN; only reliable preflight failures are N
         sends++;
         throw Object.assign(new Error('SEND_FAILED'), details);
       };
-      const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-      await assert.rejects(witness.registerRequest(payloadBytes), error => {
+      const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+      await assert.rejects(logClient.registerRequest(payloadBytes), error => {
         assert.equal(error.txHash, undefined);
         assert.equal(error.registrationStatus, status);
         return true;
@@ -612,8 +615,8 @@ test('unknown no-hash sends stay UNKNOWN; only reliable preflight failures are N
     f.evidenceLog.registerRequest = async () => {
       throw Object.assign(new Error('POST_SEND_ERROR'), details, { info: { sendTransactionHash: txHash } });
     };
-    const witness = await createEvmWitness({ ...f, deploymentBlock: 10n });
-    await assert.rejects(witness.registerRequest(payloadBytes), error => {
+    const logClient = await createEvmLogClient({ ...f, deploymentBlock: 10n });
+    await assert.rejects(logClient.registerRequest(payloadBytes), error => {
       assert.equal(error.txHash, txHash);
       assert.equal(error.registrationStatus, 'UNKNOWN');
       return true;
@@ -623,24 +626,24 @@ test('unknown no-hash sends stay UNKNOWN; only reliable preflight failures are N
 
 test('factory checks the connection once, then routes registration and reads without rechecking it', async () => {
   const f = fixture({ seeded: false });
-  const witness = await createEvmWitness({ evidenceLog: f.evidenceLog, institutionSigner: f.institutionSigner, deploymentBlock: '10' });
-  assert.deepEqual(witness.context, context);
+  const logClient = await createEvmLogClient({ evidenceLog: f.evidenceLog, institutionSigner: f.institutionSigner, deploymentBlock: '10' });
+  assert.deepEqual(logClient.context, context);
   assert.equal(f.calls.length, 0);
   f.provider.getNetwork = async () => assert.fail('UNEXPECTED_NETWORK_RECHECK');
   f.evidenceLog.getAddress = async () => assert.fail('UNEXPECTED_CONTRACT_RECHECK');
-  const request = await witness.registerRequest(payloadBytes);
-  const decision = await witness.registerDecision(0n, '0xabcd');
+  const request = await logClient.registerRequest(payloadBytes);
+  const decision = await logClient.registerDecision(0n, '0xabcd');
   assert.deepEqual(request.entry, requestEntry);
   assert.deepEqual(decision.entry, decisionEntry);
   assert.equal(f.evidenceLog.runner, f.customerSigner);
-  assert.deepEqual(await witness.readRecord(decision.txHash), decision);
-  const a = await witness.checkpoint();
-  const b = await witness.checkpoint();
+  assert.deepEqual(await logClient.readRecord(decision.txHash), decision);
+  const a = await logClient.createCheckpoint();
+  const b = await logClient.createCheckpoint();
   assert.equal(b.checkpointId, a.checkpointId + 1n);
   assert.equal(b.checkpoint.root, a.checkpoint.root);
   assert.deepEqual(f.calls.map(call => call[0]), ['registerRequest', 'registerDecision', 'createCheckpoint', 'createCheckpoint']);
-  witness.close();
-  assert.deepEqual(await witness.readRecord(request.txHash), request);
+  logClient.close();
+  assert.deepEqual(await logClient.readRecord(request.txHash), request);
 });
 
 test('factory checks signer and chain correspondence and propagates setup errors', async t => {
@@ -648,7 +651,6 @@ test('factory checks signer and chain correspondence and propagates setup errors
     ['institution mismatch', f => { f.evidenceLog.institution = async () => OTHER; }, /SIGNER_MISMATCH/],
     ['institution signer mismatch', f => { f.institutionSigner.getAddress = async () => OTHER; }, /SIGNER_MISMATCH/],
     ['missing institution signer', f => { f.institutionSigner = null; }, TypeError],
-    ['provider-only customer', f => { f.evidenceLog.runner = f.provider; }, TypeError],
     ['invalid contract address', f => { f.evidenceLog.getAddress = async () => 'invalid'; }, /invalid address/],
     ['invalid institution address', f => { f.evidenceLog.institution = async () => 'invalid'; }, /invalid address/],
     ['negative chain', f => { f.provider.getNetwork = async () => ({ chainId: -1n }); }, /unsigned/],
@@ -659,20 +661,16 @@ test('factory checks signer and chain correspondence and propagates setup errors
       const f = fixture();
       f.deploymentBlock = 10n;
       change(f);
-      await assert.rejects(createEvmWitness(f), error);
+      await assert.rejects(createEvmLogClient(f), error);
       assert.equal(f.calls.length, 0);
     });
   }
   for (const depth of [0n, 5n, 7n, 255n]) {
     const f = fixture();
     f.evidenceLog.depth = async () => depth;
-    await assert.rejects(createEvmWitness({ ...f, deploymentBlock: 10n }), /INVALID_DEPTH/);
+    await assert.rejects(createEvmLogClient({ ...f, deploymentBlock: 10n }), /INVALID_DEPTH/);
     assert.equal(f.calls.length, 0);
   }
-  const f = fixture();
-  const customer = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
-  f.customerSigner.getAddress = async () => customer;
-  assert.equal((await createEvmWitness({ ...f, deploymentBlock: 10n })).context.customerAddress, getAddress(customer));
 });
 
 test('deployment requires an explicit URL and valid depth before any provider work', async t => {
@@ -684,6 +682,103 @@ test('deployment requires an explicit URL and valid depth before any provider wo
     await assert.rejects(deployEvmWitness({ rpcUrl: 'http://offline.invalid', depth }), /INVALID_DEPTH/);
   }
   assert.equal(JsonRpcProvider.prototype.getSigner.mock.callCount(), 0);
+});
+
+test('context validation rejects malformed expectations before contract calls', async () => {
+  for (const [change, error] of [
+    [{ chainId: -1 }, /unsigned/],
+    [{ evidenceLogAddress: 'invalid' }, /invalid address/],
+    [{ depth: 5 }, /INVALID_DEPTH/],
+    [{ deploymentBlock: -1 }, /unsigned/],
+    [{ institutionAddress: 'invalid' }, /invalid address/],
+  ]) {
+    await assert.rejects(checkEvmContext(null, { ...context, ...change }), error);
+  }
+});
+
+test('context validation and checkpoint reads work with a caller-owned provider-only contract', async t => {
+  for (const [name, live, expectedError] of [
+    ['success', {}, null],
+    ['chain mismatch', { chainId: 1n }, /CHAIN_MISMATCH/],
+    ['contract mismatch', { address: OTHER }, /CONTRACT_MISMATCH/],
+    ['depth mismatch', { depth: 5n }, /INVALID_DEPTH/],
+    ['institution mismatch', { institution: OTHER }, /INSTITUTION_MISMATCH/],
+  ]) {
+    await t.test(name, async t => {
+      let signerLookups = 0;
+      const checkpoint = { size: 2n, root: digest('reader-root'), issuedAt: 1234n };
+      const calls = [];
+      t.mock.method(JsonRpcProvider.prototype, '_send', async () => assert.fail('NETWORK_FORBIDDEN'));
+      t.mock.method(JsonRpcProvider.prototype, 'getSigner', async () => {
+        signerLookups++;
+        assert.fail('SIGNER_LOOKUP_FORBIDDEN');
+      });
+      t.mock.method(JsonRpcProvider.prototype, 'getNetwork', async () => ({
+        chainId: live.chainId ?? context.chainId,
+      }));
+      t.mock.method(JsonRpcProvider.prototype, 'call', async transaction => {
+        const fragment = iface.getFunction(transaction.data.slice(0, 10));
+        const args = iface.decodeFunctionData(fragment, transaction.data);
+        calls.push([fragment.name, ...args]);
+        if (fragment.name === 'depth')
+          return iface.encodeFunctionResult(fragment, [live.depth ?? 6n]);
+        if (fragment.name === 'institution')
+          return iface.encodeFunctionResult(fragment, [live.institution ?? INSTITUTION]);
+        if (fragment.name === 'checkpointCount')
+          return iface.encodeFunctionResult(fragment, [2n]);
+        if (fragment.name === 'getCheckpoint') {
+          assert.equal(args[0], 1n);
+          return iface.encodeFunctionResult(fragment, [[checkpoint.size, checkpoint.root, checkpoint.issuedAt]]);
+        }
+        assert.fail(`UNEXPECTED_CALL: ${fragment.name}`);
+      });
+      const provider = new JsonRpcProvider('http://offline.invalid');
+      t.after(() => provider.destroy());
+      const evidenceLog = new Contract(live.address ?? EVIDENCE_LOG, artifact.abi, provider);
+
+      if (expectedError) {
+        await assert.rejects(
+          checkEvmContext(evidenceLog, context),
+          expectedError
+        );
+      } else {
+        const checked = await checkEvmContext(evidenceLog, disk(context));
+        assert.deepEqual(checked, context);
+        assert(Object.isFrozen(checked));
+        assert.deepEqual(await readCheckpoint(evidenceLog, '1'), { checkpointId: 1n, checkpoint });
+        assert.deepEqual(await readCheckpoint(evidenceLog), { checkpointId: 1n, checkpoint });
+        await assert.rejects(readCheckpoint(evidenceLog, -1), /unsigned/);
+        assert.deepEqual(calls.map(call => call[0]), [
+          'depth', 'institution', 'getCheckpoint', 'checkpointCount', 'getCheckpoint'
+        ]);
+      }
+      assert.equal(signerLookups, 0);
+      assert.equal(JsonRpcProvider.prototype._send.mock.callCount(), 0);
+    });
+  }
+});
+
+test('latest checkpoint reads reject an empty log and accept checkpoint zero', async t => {
+  let count = 0n;
+  const checkpoint = { size: 0n, root: digest('empty-root'), issuedAt: 1234n };
+  t.mock.method(JsonRpcProvider.prototype, '_send', async () => assert.fail('NETWORK_FORBIDDEN'));
+  t.mock.method(JsonRpcProvider.prototype, 'call', async transaction => {
+    const fragment = iface.getFunction(transaction.data.slice(0, 10));
+    if (fragment.name === 'checkpointCount') return iface.encodeFunctionResult(fragment, [count]);
+    if (fragment.name === 'getCheckpoint') {
+      assert.equal(iface.decodeFunctionData(fragment, transaction.data)[0], 0n);
+      return iface.encodeFunctionResult(fragment, [[checkpoint.size, checkpoint.root, checkpoint.issuedAt]]);
+    }
+    assert.fail(`UNEXPECTED_CALL: ${fragment.name}`);
+  });
+  const provider = new JsonRpcProvider('http://offline.invalid');
+  t.after(() => provider.destroy());
+  const evidenceLog = new Contract(EVIDENCE_LOG, artifact.abi, provider);
+  await assert.rejects(readCheckpoint(evidenceLog), /CHECKPOINT_NOT_FOUND/);
+  count = 1n;
+  assert.deepEqual(await readCheckpoint(evidenceLog), { checkpointId: 0n, checkpoint });
+  count = 2n;
+  assert.deepEqual(await readCheckpoint(evidenceLog, 0n), { checkpointId: 0n, checkpoint });
 });
 
 test('deployment uses signer 0/1 and local artifact; owned provider closes on success and setup failure', async t => {
@@ -723,10 +818,10 @@ test('deployment uses signer 0/1 and local artifact; owned provider closes on su
         return f.evidenceLog;
       });
       if (stage === 'success') {
-        const witness = await deployEvmWitness({ rpcUrl: 'http://offline.invalid' });
-        assert.deepEqual(witness.context, { ...context, depth: 6 });
+        const logClient = await deployEvmWitness({ rpcUrl: 'http://offline.invalid' });
+        assert.deepEqual(logClient.context, { ...context, depth: 6 });
         assert.equal(destroyed, 0);
-        witness.close();
+        logClient.close();
         assert.equal(destroyed, 1);
       } else {
         await assert.rejects(

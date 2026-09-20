@@ -13,7 +13,7 @@ function run(command, args, cwd = root) {
 
 try {
   console.log('[1/2] 계약 빌드');
-  run('forge', ['build', '--offline'], join(root, 'contracts'));
+  run('forge', ['build', '--offline', '--no-lint', '--quiet'], join(root, 'contracts'));
 
   console.log('[2/2] 실제 Anvil 실행 및 통합 테스트');
   run(process.execPath, [

@@ -55,18 +55,18 @@ function checkpointOf(checkpoint) {
   };
 }
 
-export function checkpointInfo(trust) {
-  const depth = safeNumber(trust.depth);
+export function checkpointInfo(verificationContext) {
+  const depth = safeNumber(verificationContext.depth);
   assert.equal(depth, 6, 'INVALID_DEPTH');
 
-  const checkpoint = checkpointOf(trust.checkpoint);
+  const checkpoint = checkpointOf(verificationContext.checkpoint);
   assert(checkpoint.size <= 64n, 'INVALID_CHECKPOINT_SIZE');
 
   return {
-    chainId: uint(trust.chainId),
-    evidenceLogAddress: getAddress(trust.evidenceLogAddress),
+    chainId: uint(verificationContext.chainId),
+    evidenceLogAddress: getAddress(verificationContext.evidenceLogAddress),
     depth,
-    checkpointId: uint(trust.checkpointId),
+    checkpointId: uint(verificationContext.checkpointId),
     checkpoint,
   };
 }
@@ -115,7 +115,7 @@ export function buildTree(rawEntries, context) {
   };
 }
 
-function checkEntry(rawEntry, info, trust) {
+function checkEntry(rawEntry, info, context) {
   const entry = entryOf(rawEntry);
   assert(
     entry.index < info.checkpoint.size && entry.recordedAt <= info.checkpoint.issuedAt,
@@ -124,11 +124,7 @@ function checkEntry(rawEntry, info, trust) {
   assert(entry.kind === 0n || entry.kind === 1n, 'INVALID_KIND');
   assert(entry.payloadHash !== ZeroHash, 'ZERO_PAYLOAD_HASH');
 
-  // Requests are permissionless; only decisions have a contract-wide actor restriction.
-  assert(
-    entry.kind === 0n || entry.actor === getAddress(trust.institutionAddress),
-    'ACTOR_MISMATCH'
-  );
+  assert(entry.actor === getAddress(context.institutionAddress), 'ACTOR_MISMATCH');
   assert(
     entry.kind === 0n ? entry.requestIndex === entry.index : entry.requestIndex < entry.index,
     'REQUEST_LINK_MISMATCH'
@@ -137,14 +133,14 @@ function checkEntry(rawEntry, info, trust) {
   return entry;
 }
 
-export function checkedLog(rawEntries, trust) {
-  const info = checkpointInfo(trust);
+export function verifyLogRecords(rawEntries, verificationContext) {
+  const info = checkpointInfo(verificationContext);
   assert(
     Array.isArray(rawEntries) && BigInt(rawEntries.length) === info.checkpoint.size,
     'LOG_SIZE_MISMATCH'
   );
 
-  const entries = rawEntries.map(entry => checkEntry(entry, info, trust));
+  const entries = rawEntries.map(entry => checkEntry(entry, info, verificationContext));
   const requests = new Set();
   const decisions = new Set();
   const hashes = new Set();
@@ -174,16 +170,13 @@ export function checkedLog(rawEntries, trust) {
   return { checkpointInfo: info, entries, tree };
 }
 
-function verifyEntryInclusion(item, info, trust) {
+function verifyEntryInclusion(item, info, context) {
   assert(
     item && Array.isArray(item.proof) && item.proof.length === info.depth,
     'INVALID_PROOF_LENGTH'
   );
 
-  const entry = checkEntry(item.entry, info, trust);
-  if (entry.kind === 0n) {
-    assert.equal(entry.actor, getAddress(trust.customerAddress), 'ACTOR_MISMATCH');
-  }
+  const entry = checkEntry(item.entry, info, context);
 
   let current = leafHash(entry, info);
   for (const sibling of item.proof) current = parent(current, bytes32(sibling));
@@ -191,11 +184,11 @@ function verifyEntryInclusion(item, info, trust) {
   return entry;
 }
 
-export function verifyInclusions(items, checkpointId, trust) {
-  const info = checkpointInfo(trust);
+export function verifyInclusions(items, checkpointId, verificationContext) {
+  const info = checkpointInfo(verificationContext);
   assert.equal(uint(checkpointId), info.checkpointId, 'CHECKPOINT_MISMATCH');
   assert(Array.isArray(items), 'INVALID_EVIDENCE');
-  return { checkpointInfo: info, entries: items.map(item => verifyEntryInclusion(item, info, trust)) };
+  return { checkpointInfo: info, entries: items.map(item => verifyEntryInclusion(item, info, verificationContext)) };
 }
 
 function providerOf(evidenceLog) {
@@ -210,7 +203,7 @@ function events(evidenceLog, receipt, address, name) {
     .map(log => evidenceLog.interface.parseLog(log).args.toObject());
 }
 
-export async function readRecord(evidenceLog, txHash, trust) {
+export async function readRecord(evidenceLog, txHash, context) {
   txHash = bytes32(txHash);
 
   const provider = providerOf(evidenceLog);
@@ -226,8 +219,8 @@ export async function readRecord(evidenceLog, txHash, trust) {
   const block = await provider.getBlock(receipt.blockNumber);
   assert(block && block.hash.toLowerCase() === blockHash, 'BLOCK_MISMATCH');
 
-  const checkpoints = events(evidenceLog, receipt, trust.evidenceLogAddress, 'CheckpointPublished');
-  const entries = events(evidenceLog, receipt, trust.evidenceLogAddress, 'EntryRecorded');
+  const checkpoints = events(evidenceLog, receipt, context.evidenceLogAddress, 'CheckpointPublished');
+  const entries = events(evidenceLog, receipt, context.evidenceLogAddress, 'EntryRecorded');
   assert(checkpoints.length === 1 && entries.length <= 1, 'INVALID_RECEIPT');
 
   const checkpointId = checkpoints[0].checkpointId;
@@ -237,8 +230,8 @@ export async function readRecord(evidenceLog, txHash, trust) {
   return { txHash, entry, checkpointId, checkpoint, blockNumber, blockHash };
 }
 
-async function sendAndReadRecord(evidenceLog, trust, method, args) {
-  const actor = method === 'registerRequest' ? trust.customerAddress : trust.institutionAddress;
+async function sendAndReadRecord(evidenceLog, context, method, args) {
+  const actor = context.institutionAddress;
   if (method !== 'createCheckpoint') {
     assert.equal(
       getAddress(await evidenceLog.runner.getAddress()),
@@ -253,7 +246,7 @@ async function sendAndReadRecord(evidenceLog, trust, method, args) {
     tx = await evidenceLog[method](...args);
     await tx.wait();
 
-    const record = await readRecord(evidenceLog, tx.hash, trust);
+    const record = await readRecord(evidenceLog, tx.hash, context);
     if (method === 'createCheckpoint') {
       assert.equal(record.entry, null, 'UNEXPECTED_ENTRY');
     } else {
@@ -303,13 +296,12 @@ async function sendAndReadRecord(evidenceLog, trust, method, args) {
   }
 }
 
-export async function createEvmWitness({ evidenceLog, institutionSigner, deploymentBlock }) {
-  const [network, address, depthValue, institution, customer, signerAddress] = await Promise.all([
+export async function createEvmLogClient({ evidenceLog, institutionSigner, deploymentBlock }) {
+  const [network, address, depthValue, institution, signerAddress] = await Promise.all([
     providerOf(evidenceLog).getNetwork(),
     evidenceLog.getAddress(),
     evidenceLog.depth(),
     evidenceLog.institution(),
-    evidenceLog.runner.getAddress(),
     institutionSigner.getAddress(),
   ]);
   const depth = Number(depthValue);
@@ -320,7 +312,6 @@ export async function createEvmWitness({ evidenceLog, institutionSigner, deploym
     evidenceLogAddress: getAddress(address),
     depth,
     deploymentBlock: BigInt(deploymentBlock),
-    customerAddress: getAddress(customer),
     institutionAddress: getAddress(institution),
   });
   assert.equal(getAddress(signerAddress), context.institutionAddress, 'SIGNER_MISMATCH');
@@ -341,7 +332,7 @@ export async function createEvmWitness({ evidenceLog, institutionSigner, deploym
     context,
 
     registerRequest(bytes) {
-      return sendAndReadRecord(evidenceLog, context, 'registerRequest', [payloadHash(bytes)]);
+      return sendAndReadRecord(institutionLog, context, 'registerRequest', [payloadHash(bytes)]);
     },
 
     registerDecision(requestIndex, bytes) {
@@ -352,18 +343,59 @@ export async function createEvmWitness({ evidenceLog, institutionSigner, deploym
       return readRecord(evidenceLog, txHash, context);
     },
 
-    async readCheckpoint(checkpointId) {
-      checkpointId = uint(checkpointId);
-      const checkpoint = checkpointOf(await evidenceLog.getCheckpoint(checkpointId));
-      return { checkpointId, checkpoint };
+    readCheckpoint(checkpointId) {
+      return readCheckpoint(evidenceLog, checkpointId);
     },
 
-    checkpoint() {
-      return sendAndReadRecord(evidenceLog, context, 'createCheckpoint', []);
+    createCheckpoint() {
+      return sendAndReadRecord(institutionLog, context, 'createCheckpoint', []);
     },
 
     close() { },
   };
+}
+
+export async function evidenceLogArtifact() {
+  return JSON.parse(
+    await readFile(
+      new URL('../contracts/out/EvidenceLog.sol/EvidenceLog.json', import.meta.url),
+      'utf8'
+    )
+  );
+}
+
+export async function checkEvmContext(evidenceLog, context) {
+  const expected = Object.freeze({
+    chainId: uint(context?.chainId),
+    evidenceLogAddress: getAddress(context?.evidenceLogAddress),
+    depth: safeNumber(context?.depth),
+    deploymentBlock: uint(context?.deploymentBlock),
+    institutionAddress: getAddress(context?.institutionAddress),
+  });
+  assert.equal(expected.depth, 6, 'INVALID_DEPTH');
+
+  const [network, address, depth, institution] = await Promise.all([
+    providerOf(evidenceLog).getNetwork(),
+    evidenceLog.getAddress(),
+    evidenceLog.depth(),
+    evidenceLog.institution(),
+  ]);
+  assert.equal(network.chainId, expected.chainId, 'CHAIN_MISMATCH');
+  assert.equal(getAddress(address), expected.evidenceLogAddress, 'CONTRACT_MISMATCH');
+  assert.equal(safeNumber(depth), expected.depth, 'INVALID_DEPTH');
+  assert.equal(getAddress(institution), expected.institutionAddress, 'INSTITUTION_MISMATCH');
+  return expected;
+}
+
+export async function readCheckpoint(evidenceLog, checkpointId) {
+  if (checkpointId === undefined) {
+    const count = uint(await evidenceLog.checkpointCount());
+    assert(count > 0n, 'CHECKPOINT_NOT_FOUND');
+    checkpointId = count - 1n;
+  }
+  checkpointId = uint(checkpointId);
+  const checkpoint = checkpointOf(await evidenceLog.getCheckpoint(checkpointId));
+  return { checkpointId, checkpoint };
 }
 
 export async function deployEvmWitness({ rpcUrl, depth = 6 } = {}) {
@@ -371,12 +403,7 @@ export async function deployEvmWitness({ rpcUrl, depth = 6 } = {}) {
   depth = safeNumber(depth);
   assert.equal(depth, 6, 'INVALID_DEPTH');
 
-  const artifact = JSON.parse(
-    await readFile(
-      new URL('../contracts/out/EvidenceLog.sol/EvidenceLog.json', import.meta.url),
-      'utf8'
-    )
-  );
+  const artifact = await evidenceLogArtifact();
   const provider = new JsonRpcProvider(rpcUrl);
 
   try {
@@ -390,14 +417,14 @@ export async function deployEvmWitness({ rpcUrl, depth = 6 } = {}) {
     const receipt = await evidenceLog.deploymentTransaction().wait();
     assert(receipt?.status === 1, 'DEPLOYMENT_NOT_CONFIRMED');
 
-    const witness = await createEvmWitness({
+    const logClient = await createEvmLogClient({
       evidenceLog,
       institutionSigner,
       deploymentBlock: receipt.blockNumber
     });
 
     return {
-      ...witness,
+      ...logClient,
       close() {
         provider.destroy();
       }

@@ -1,33 +1,41 @@
 import assert from 'node:assert/strict';
-import { createSystem, decodePayload, encodePayload, hash } from '../src/evidence.js';
+import { generateKeyPairSync } from 'node:crypto';
+import { createInstitution, createRequest, decodePayload, encodePayload, hash } from '../src/evidence.js';
 import { buildTree, payloadHash } from '../src/evm.js';
 
-export const CUSTOMER = '0x0000000000000000000000000000000000000001';
 export const INSTITUTION = '0x0000000000000000000000000000000000000002';
 export const OTHER = '0x0000000000000000000000000000000000000004';
+export const POLICY = Object.freeze({
+  version: 1,
+  id: 'per-transfer-limit-v1',
+  institution: 'demo-bank',
+  currency: 'KRW',
+  limit: 1000000,
+  decisionWindow: 60
+});
 export const json = value => JSON.stringify(value, (_, item) => typeof item === 'bigint' ? item.toString() : item);
 export const disk = value => JSON.parse(json(value));
 
 // A boundary double for business tests; actual EVM roots/state are checked by the Anvil suite.
 export function createTestWitness() {
   const context = { chainId: 31337n, evidenceLogAddress: '0x0000000000000000000000000000000000000003',
-    depth: 6, deploymentBlock: 0, customerAddress: CUSTOMER, institutionAddress: INSTITUTION };
+    depth: 6, deploymentBlock: 0, institutionAddress: INSTITUTION };
   const records = []; const registrations = new Map(); const checkpoints = new Map(); const calls = [];
   let sequence = 0;
-  const witness = { context, records, calls, time: 1000,
+  const logClient = { context, records, calls, time: 1000,
     publish(entry = null) {
       const checkpointId = BigInt(sequence++);
       const result = { txHash: `0x${hash(`tx-${sequence}`)}`, entry, checkpointId,
-        checkpoint: { size: BigInt(records.length), root: buildTree(records, context).root, issuedAt: BigInt(witness.time) },
+        checkpoint: { size: BigInt(records.length), root: buildTree(records, context).root, issuedAt: BigInt(logClient.time) },
         blockNumber: sequence, blockHash: `0x${hash(`block-${sequence}`)}` };
       registrations.set(result.txHash, structuredClone(result));
       checkpoints.set(checkpointId, structuredClone(result.checkpoint));
       return structuredClone(result);
     },
-    record(bytes, { actor = CUSTOMER, requestIndex } = {}) {
+    record(bytes, { actor = INSTITUTION, requestIndex } = {}) {
       const index = BigInt(records.length); const kind = requestIndex === undefined ? 0n : 1n;
       assert(index < 2n ** BigInt(context.depth), 'TREE_CAPACITY_EXCEEDED');
-      assert(!records.length || BigInt(witness.time) >= records.at(-1).recordedAt, 'INVALID_TIME');
+      assert(!records.length || BigInt(logClient.time) >= records.at(-1).recordedAt, 'INVALID_TIME');
       if (kind === 0n) {
         assert(!records.some(entry => entry.kind === 0n && entry.actor === actor && entry.payloadHash === payloadHash(bytes)), 'DUPLICATE_REQUEST_HASH');
       } else {
@@ -35,17 +43,17 @@ export function createTestWitness() {
         assert(!records.some(entry => entry.kind === 1n && entry.requestIndex === BigInt(requestIndex)), 'DUPLICATE_DECISION');
       }
       const entry = { index, kind, actor, requestIndex: kind === 0n ? index : BigInt(requestIndex),
-        payloadHash: payloadHash(bytes), recordedAt: BigInt(witness.time) };
+        payloadHash: payloadHash(bytes), recordedAt: BigInt(logClient.time) };
       records.push(entry);
-      return witness.publish(entry);
+      return logClient.publish(entry);
     },
     async registerRequest(bytes) {
       calls.push({ method: 'registerRequest', bytes });
-      return witness.record(bytes);
+      return logClient.record(bytes);
     },
     async registerDecision(requestIndex, bytes) {
       calls.push({ method: 'registerDecision', bytes, requestIndex });
-      return witness.record(bytes, { actor: INSTITUTION, requestIndex });
+      return logClient.record(bytes, { actor: INSTITUTION, requestIndex });
     },
     async readRecord(txHash) {
       assert(registrations.has(txHash), 'REGISTRATION_NOT_CONFIRMED');
@@ -56,24 +64,17 @@ export function createTestWitness() {
       assert(checkpoints.has(checkpointId), 'CHECKPOINT_NOT_FOUND');
       return { checkpointId, checkpoint: structuredClone(checkpoints.get(checkpointId)) };
     },
-    async checkpoint() { return witness.publish(); },
+    async readLatestCheckpoint() {
+      assert(sequence > 0, 'CHECKPOINT_NOT_FOUND');
+      return logClient.readCheckpoint(BigInt(sequence - 1));
+    },
+    async createCheckpoint() { return logClient.publish(); },
   };
-  return witness;
+  return logClient;
 }
 
 export function entryView(registration, bytes) {
   return { payloadBytes: bytes, record: registration.entry, checkpointId: registration.checkpointId };
-}
-
-export async function receiptFor(system, request) {
-  const trust = await system.trust(request.checkpointId);
-  return system.bundle(request, undefined, trust);
-}
-
-export async function recordedReceipt(witness, entry) {
-  const { checkpointId, checkpoint } = await witness.readCheckpoint(entry.checkpointId);
-  const tree = buildTree(witness.records.slice(0, Number(checkpoint.size)), witness.context);
-  return { checkpointId, request: { entry: structuredClone(entry), proof: tree.proof(entry.record.index) } };
 }
 
 export function alterPayload(entry, change) {
@@ -83,12 +84,28 @@ export function alterPayload(entry, change) {
 }
 
 export async function fixture(amount = 1500000) {
-  const witness = createTestWitness();
-  const s = createSystem({ witness });
-  const request = await s.submit('req-1', amount);
-  witness.time = 1060;
-  const receipt = await receiptFor(s, request);
-  const decision = await s.decide(receipt);
-  const trust = await s.trust();
-  return { witness, s, request, receipt, decision, trust, bundle: s.bundle(request, decision, trust) };
+  const logClient = createTestWitness();
+  const customerKeys = generateKeyPairSync('ed25519');
+  const institutionKeys = generateKeyPairSync('ed25519');
+  const customerKey = customerKeys.publicKey.export({ type: 'spki', format: 'pem' });
+  const institution = createInstitution({
+    logClient,
+    policy: POLICY,
+    institutionKeys,
+    customerKey
+  });
+  const envelope = createRequest({
+    id: 'req-1', amount, policy: POLICY, customerPrivateKey: customerKeys.privateKey
+  });
+  const receipt = await institution.accept(envelope);
+  const request = receipt.request.entry;
+  logClient.time = 1060;
+  const bundle = await institution.decide(receipt);
+  const decision = bundle.decision.entry;
+  const verificationContext = await institution.getVerificationContext(bundle.checkpointId);
+  const entries = await institution.exportLog(bundle.checkpointId);
+  return {
+    logClient, institution, customerKeys, institutionKeys, customerKey,
+    request, receipt, decision, verificationContext, bundle, entries, policy: POLICY
+  };
 }
