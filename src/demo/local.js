@@ -6,14 +6,14 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPublicClient, createWalletClient, http, keccak256 } from 'viem';
+import { createPublicClient, createWalletClient, encodeDeployData, http, keccak256 } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { foundry } from 'viem/chains';
 import { Archive, EvidenceStore } from '../v3/store.js';
 import { ChainReader, jsonRpc } from '../v3/chain.js';
 import { createEvidenceServer } from '../v3/server.js';
 import { auditAll } from '../v3/verify.js';
-import { canonical, hash, sign, check } from '../v3/crypto.js';
+import { addressShape, canonical, hash, sign, check } from '../v3/crypto.js';
 import { requestRecord, scope } from '../v3/policy.js';
 import { buildTree } from '../v3/merkle.js';
 import { auditFile, readUpload } from './audit-file.js';
@@ -39,7 +39,8 @@ const artifact = (file, name) => JSON.parse(readFileSync(join(root, 'out', file,
 
 // This harness always spawns its own loopback chain. It never accepts an external
 // RPC or a real signing key; the public Anvil account is usable only here.
-export async function startDemo({ port = 4040, directory = join(root, '.local-demo'), profileFile = process.env.AUDIT_PROFILES_FILE } = {}) {
+export async function startDemo({ port = 4040, directory = join(root, '.local-demo'), profileFile = process.env.AUDIT_PROFILES_FILE,
+  deploymentPublisher = process.env.WALLET_ADDRESS } = {}) {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const runDirectory = mkdtempSync(join(directory, 'run-'));
   const rpcPort = await unusedPort(), rpcUrl = `http://127.0.0.1:${rpcPort}`;
@@ -138,6 +139,20 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
     }
     const profiles = new Map([...records.values()].map(record => [record.trust.policyHash,
       { trust: record.trust, rpcUrl, asOf: record.asOf.blockHash, label: `LOCAL / ${record.info.title}` }]));
+    const publisher = deploymentPublisher?.toLowerCase();
+    check(!publisher || addressShape(publisher), 'INVALID_DEPLOYMENT_PUBLISHER');
+    const deployment = publisher ? {
+      chainId: 84532,
+      chainName: 'Base Sepolia',
+      publisher,
+      contract: 'RecordAnchor',
+      transaction: {
+        from: publisher,
+        data: encodeDeployData({ abi: anchorArtifact.abi, bytecode: anchorArtifact.bytecode.object, args: [publisher] }),
+        value: '0x0',
+      },
+      simulation: { status: 'PASSED', gasEstimate: '220958' },
+    } : null;
     if (profileFile) {
       for (const config of JSON.parse(readFileSync(profileFile, 'utf8'))) {
         const trust = JSON.parse(readFileSync(resolve(root, config.trustFile), 'utf8'));
@@ -165,7 +180,8 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
           res.writeHead(200, { ...headers, 'content-type': path === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8' }).end(path === '/' ? index : js); return;
         }
         let result;
-        if (path === '/api/profiles') result = [...profiles].map(([id, p]) => ({ id, label: p.label, institutionId: p.trust.policy.institutionId, policyId: p.trust.policy.policyId, chainId: p.trust.policy.chainId, anchorAddress: p.trust.policy.anchorAddress, cutoff: p.asOf ?? 'finalized' }));
+        if (path === '/api/deployment') result = deployment ?? { status: 'NOT_CONFIGURED' };
+        else if (path === '/api/profiles') result = [...profiles].map(([id, p]) => ({ id, label: p.label, institutionId: p.trust.policy.institutionId, policyId: p.trust.policy.policyId, chainId: p.trust.policy.chainId, anchorAddress: p.trust.policy.anchorAddress, cutoff: p.asOf ?? 'finalized' }));
         else if (path.startsWith('/api/sample/')) {
           const record = records.get(path.slice('/api/sample/'.length));
           check(record, 'UNKNOWN_SAMPLE');
