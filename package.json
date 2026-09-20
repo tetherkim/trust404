@@ -8,13 +8,13 @@
     "test:contracts": "forge test",
     "test:integration": "forge build && node --test test/integration/*.test.js",
     "evidence": "node src/cli.js",
-    "demo:local": "forge build && node --env-file-if-exists=.env src/demo/local.js",
-    "demo:aim": "forge build && node src/demo/aim.js",
+    "demo:local": "forge build && node --env-file-if-exists=.env demo/local.js",
+    "demo:aim": "forge build && node demo/aim.js",
     "check:testnet": "node scripts/check-base-sepolia.js",
     "check:aomi": "node scripts/check-aomi.js",
     "operator": "node --env-file-if-exists=.env src/operator/run.js",
-    "audit:serve": "node src/demo/audit-server.js",
-    "serve": "node --env-file-if-exists=.env src/hosted/server.js"
+    "audit:serve": "node demo/audit-server.js",
+    "serve": "node --env-file-if-exists=.env demo/portal/server.js"
   },
   "engines": {
     "node": ">=22.22.2"

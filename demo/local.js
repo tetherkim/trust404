@@ -9,18 +9,18 @@ import { fileURLToPath } from 'node:url';
 import { createPublicClient, createWalletClient, encodeDeployData, http, keccak256 } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { foundry } from 'viem/chains';
-import { Archive, EvidenceStore } from '../storage/store.js';
-import { ChainReader } from '../chain/reader.js';
-import { jsonRpc } from '../common/rpc.js';
-import { createEvidenceServer } from '../server/server.js';
-import { auditAll } from '../verifier/verify.js';
-import { addressShape, canonical, hash, sign, check } from '../common/crypto.js';
-import { requestRecord, scope } from '../policy/policy.js';
-import { buildTree } from '../common/merkle.js';
+import { Archive, EvidenceStore } from '../src/storage/store.js';
+import { ChainReader } from '../src/chain/reader.js';
+import { jsonRpc } from '../src/common/rpc.js';
+import { createEvidenceServer } from '../src/server/server.js';
+import { auditAll } from '../src/verifier/verify.js';
+import { addressShape, canonical, hash, sign, check } from '../src/common/crypto.js';
+import { requestRecord, scope } from '../src/policy/policy.js';
+import { buildTree } from '../src/common/merkle.js';
 import { auditFile, readUpload } from './audit-file.js';
-import { stopProcess, closeHttpServer } from '../../scripts/local-process.js';
+import { stopProcess, closeHttpServer } from '../scripts/local-process.js';
 
-const root = fileURLToPath(new URL('../../', import.meta.url));
+const root = fileURLToPath(new URL('../', import.meta.url));
 const cases = [
   { id: 'rejection', title: '정상 거절', description: '접수 당시 잔액 120에서 50을 지급하면 최소 잔액 100을 지킬 수 없습니다.' },
   { id: 'tamper', title: '기록 변조', description: '보관 파일의 판단 내용을 바꿔 계약에 등록된 해시와 비교합니다.' },

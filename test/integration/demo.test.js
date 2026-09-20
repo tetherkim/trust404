@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { get } from 'node:http';
-import { startDemo } from '../../src/demo/local.js';
+import { startDemo } from '../../demo/local.js';
 
 test('시연 준비 중 취소하면 Anvil 정리를 마치고 중단 사유를 반환한다', { timeout: 10000 }, async t => {
   const directory = mkdtempSync(join(tmpdir(), 'trust404-demo-abort-'));

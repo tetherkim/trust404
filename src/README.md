@@ -33,18 +33,7 @@ src/
 ├── operator/           # 기관 운영자(트랜잭션 앵커링 및 Aomi)
 │   ├── run.js          # 지갑/키 관리, 배치 앵커링, 복구 저널, 증거 export 데몬
 │   └── aomi.js         # Aomi SDK 및 SIWE 인증 연동, 트랜잭션 시뮬레이션
-├── hosted/             # 사용자 판단 요청 웹 포털
-│   ├── server.js       # 접근 코드 인증, 작업 대기열, 세션 관리
-│   ├── portal.html     # 사용자 판단 요청 포털 UI
-│   └── portal.js       # 포털 클라이언트 로직
-├── demo/               # 검증 시연 및 감사 UI
-│   ├── local.js        # Anvil 기반 정상/공격 5대 시나리오 시연 환경
-│   ├── aim.js          # AIM 평가용 독립 프로세스 검증 시연
-│   ├── audit-server.js # 감사관 로컬 감사 서버
-│   ├── audit-file.js   # 업로드 파일 규격 검사 및 감사 실행기
-│   └── ui.js           # 브라우저 기반 감사 UI
-└── v3/                 # 하위 호환성 유지 파사드 (기존 import 및 CLI 지원)
-    └── cli.js          # 단건 검증 및 전수 감사 CLI (verify, audit, serve)
+└── cli.js              # 통합 단건 검증 및 전수 감사 CLI (verify, audit, serve)
 ```
 
 ---

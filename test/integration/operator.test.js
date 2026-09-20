@@ -11,7 +11,7 @@ import {once} from 'node:events';
 import {foundry} from 'viem/chains';
 import {createWalletClient,http} from 'viem';
 import {mnemonicToAccount} from 'viem/accounts';
-import {startAuditServer} from '../../src/demo/audit-server.js';
+import {startAuditServer} from '../../demo/audit-server.js';
 import {Operator} from '../../src/operator/run.js';
 import {canonical} from '../../src/common/crypto.js';
 import {stopProcess} from '../../scripts/local-process.js';

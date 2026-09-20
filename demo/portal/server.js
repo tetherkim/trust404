@@ -7,8 +7,8 @@ import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {once} from 'node:events';
-import {auditFile,readUpload} from '../demo/audit-file.js';
-import {check} from '../common/crypto.js';
+import {auditFile,readUpload} from '../audit-file.js';
+import {check} from '../../src/common/crypto.js';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const equal=(a,b)=>timingSafeEqual(createHash('sha256').update(a).digest(),createHash('sha256').update(b).digest());
@@ -84,7 +84,7 @@ export async function startHostedServer({directory,accessCode,origin,port=8080,h
     const stamp=String(Date.now()+14400000);
     send(200,{ok:true},{'set-cookie':`trust404_session=${stamp}.${signature(stamp)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=14400${expected.startsWith('https:')?'; Secure':''}`});return;
    }
-   const pages={'/':['./portal.html','text/html; charset=utf-8'],'/portal.js':['./portal.js','text/javascript; charset=utf-8'],'/audit':['../demo/index.html','text/html; charset=utf-8'],'/ui.js':['../demo/ui.js','text/javascript; charset=utf-8']};
+   const pages={'/':['./portal.html','text/html; charset=utf-8'],'/portal.js':['./portal.js','text/javascript; charset=utf-8'],'/audit':['../index.html','text/html; charset=utf-8'],'/ui.js':['../ui.js','text/javascript; charset=utf-8']};
    if(req.method==='GET'&&pages[path]){const [file,type]=pages[path];serveFile(new URL(file,import.meta.url),type);return;}
    if(!authenticated(req)){send(401,{error:'LOGIN_REQUIRED'});return;}
    if(req.method==='GET'&&path==='/api/status'){

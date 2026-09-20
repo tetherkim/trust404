@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {runInNewContext} from 'node:vm';
 import {DatabaseSync} from 'node:sqlite';
-import {startHostedServer} from '../../src/hosted/server.js';
+import {startHostedServer} from '../../demo/portal/server.js';
 
 const code='test-only-access-code-32-characters';
 async function client(app){
@@ -77,7 +77,7 @@ test('[웹 포털] 세션 만료 시 로그인 화면 복원 및 폴링 중단 �
  const document={getElementById(id){if(!elements.has(id))elements.set(id,{hidden:id==='login-panel',addEventListener(){}});return elements.get(id);}};
  const context={document,sessionStorage:{getItem:()=>null},fetch:async()=>({ok:false,status:401,json:async()=>({error:'LOGIN_REQUIRED'})}),clearTimeout(){},setTimeout:fn=>timers.push(fn)};
  // Exercise the shipped script, including its initial refresh.
- runInNewContext(readFileSync(new URL('../../src/hosted/portal.js',import.meta.url),'utf8'),context);
+ runInNewContext(readFileSync(new URL('../../demo/portal/portal.js',import.meta.url),'utf8'),context);
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(document.getElementById('login-panel').hidden,false);
  assert.equal(document.getElementById('workspace').hidden,true);
@@ -87,7 +87,7 @@ test('[웹 포털] 세션 만료 시 로그인 화면 복원 및 폴링 중단 �
 
 test('[웹 포털] 저장 완료 상태와 감사 성공 및 체인 완결성(Finality) 구분 표시 검증',()=>{
  const context={document:{getElementById:()=>({addEventListener(){}})},sessionStorage:{getItem:()=>null},fetch:()=>new Promise(()=>{})};
- runInNewContext(readFileSync(new URL('../../src/hosted/portal.js',import.meta.url),'utf8'),context);
+ runInNewContext(readFileSync(new URL('../../demo/portal/portal.js',import.meta.url),'utf8'),context);
  const result={auditOk:false,finality:'PROVISIONAL',requestAudit:{decisions:[{record:'VALID',policy:'MATCH'}]}};
  assert.equal(context.auditSummary(result),'개별 서명·정책 일치 / 전체 감사 이상 있음 / 체인 확정 대기');
  assert.equal(context.auditSummary(null),'미검증');
