@@ -41,6 +41,27 @@ npm ci
 
 아래 명령은 모두 저장소 루트에서 실행합니다. 감사만 하는 사람은 Foundry·지갑·test ETH가 필요 없습니다.
 
+### 환경변수와 Aomi 인증
+
+[.env.example](.env.example)에 실제 사용하는 설정을 정리했습니다. **기존 파일 감사와 CLI의 Aomi 실행에는 `.env`가 필수가 아닙니다.** 로컬 웹 요청 화면까지 사용할 때 복사합니다.
+
+```sh
+cp .env.example .env
+```
+
+`DEMO_ACCESS_CODE`에 24자 이상의 임의 값을 넣습니다. `npm run operator`와 `npm run serve`는 저장소 루트의 `.env`를 자동으로 읽습니다. 이미 주입된 환경변수가 우선하며, 파일 감사 명령 `audit:serve`는 이 설정을 사용하지 않습니다.
+
+| 설정 | 필요한 경우 / 의미 |
+| --- | --- |
+| `DEMO_ACCESS_CODE` | 웹 서버 필수. 팀 접속 코드 |
+| `HOST`, `PORT`, `PUBLIC_ORIGIN` | 웹 서버 주소. 예제는 `http://127.0.0.1:8080` |
+| `DATA_DIR`, `OPERATOR_DIR` | 대기열과 운영 지갑·기록 저장 경로. `OPERATOR_DIR`은 `DATA_DIR/operator`와 일치시킴 |
+| Aomi API 키·모델 API 키 | 현재 경로에서는 입력 불필요. 전용 지갑의 SIWE 로그인 사용 |
+
+4절의 지갑 생성·충전·계약 배포를 마친 후 `npm run serve`를 실행하면 웹에서 요청할 수 있습니다. Aomi 인증 세션은 `OPERATOR_DIR/aomi-session`에 자동 저장·갱신됩니다. API 키 입력이 없다는 뜻이며, Aomi 서비스의 이용 가능 여부·크레딧과 체인 가스는 별개입니다.
+
+`.env`와 운영 지갑 폴더는 Git에 올리지 않습니다. 이 예제는 로컬 실행용이며 공개 배포 설정은 포함하지 않습니다.
+
 ## 2. 가장 빠른 시연: 실제 기록 파일 감사
 
 ```sh
