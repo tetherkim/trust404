@@ -1,1 +1,25 @@
-{"name":"trust404-track3","private":true,"type":"module","scripts":{"test":"node --test","demo":"node src/cli.js demo"},"engines":{"node":">=22"}}
+{
+  "name": "trust404-track3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js test/v3/*.test.js",
+    "demo": "node src/cli.js demo",
+    "test:contracts": "forge test",
+    "test:integration": "forge build && node --test test/integration/*.test.js",
+    "evidence": "node src/v3/cli.js",
+    "demo:local": "forge build && node --env-file-if-exists=.env src/demo/local.js",
+    "check:testnet": "node scripts/check-base-sepolia.js",
+    "check:aomi": "node scripts/check-aomi.js",
+    "operator": "node src/operator/run.js",
+    "audit:serve": "node src/demo/audit-server.js"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "dependencies": {
+    "@aomi-labs/client": "0.7.6",
+    "canonicalize": "5.0.0",
+    "viem": "2.56.8"
+  }
+}
