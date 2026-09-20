@@ -1,115 +1,34 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TRUST404 · 출금 판단 검증</title>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRUST404 · Audit Console</title>
 <style>
-:root { color-scheme:dark; font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#f4f2fa; background:#0d0d13; line-height:1.6; --muted:#aaa6ba; --line:#2c2939; --accent:#a995ff; }
-* { box-sizing:border-box; }
-body { margin:0; background:radial-gradient(ellipse at 0 0,#21163888,transparent 55%); min-height:100vh; }
-button { font:inherit; cursor:pointer; color:inherit; }
-button:disabled { cursor:wait; opacity:.55; }
-button:focus-visible,summary:focus-visible,a:focus-visible { outline:2px solid #b9a7ff; outline-offset:4px; }
-header { border-bottom:1px solid var(--line); background:#0e0d16bb; }
-.topbar { max-width:1280px; margin:auto; padding:18px 32px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.brand { font-weight:850; letter-spacing:-.04em; font-size:23px; }
-.brand span { font-weight:450; color:var(--muted); font-size:12px; letter-spacing:.02em; margin-left:16px; }
-.environment { font-family:ui-monospace,monospace; font-size:11px; color:var(--muted); display:flex; gap:8px; flex-wrap:wrap; }
-.environment span { border:1px solid var(--line); padding:5px 10px; }
-main { max-width:1280px; margin:auto; padding:30px 32px 16px; }
-.intro { margin-bottom:25px; }
-.eyebrow { display:flex; align-items:center; gap:16px; color:var(--accent); font:600 10px ui-monospace,monospace; letter-spacing:.16em; margin-bottom:14px; }
-.eyebrow::after { content:""; height:1px; background:var(--line); flex:1; }
-h1 { font-size:38px; letter-spacing:-.05em; line-height:1.25; margin:0 0 10px; font-weight:750; }
-p { margin:0; }
-.muted { color:var(--muted); font-size:13px; }
-.workspace { display:grid; grid-template-columns:215px minmax(0,1fr); gap:28px; }
-.section-label { font-size:11px; font-weight:600; color:var(--muted); margin:0 0 10px; letter-spacing:.07em; }
-.scenario-list { display:flex; flex-direction:column; }
-.scenario { display:flex; gap:13px; width:100%; text-align:left; border:0; border-left:2px solid transparent; border-bottom:1px solid #24222e; background:transparent; padding:16px 12px; }
-.scenario:hover { background:#1b1826; }
-.scenario[aria-pressed=true] { background:#201a33; border-left-color:#987cff; }
-.number { font:12px ui-monospace,monospace; color:#898399; padding-top:4px; }
-.scenario[aria-pressed=true] .number { color:var(--accent); }
-.scenario strong { display:block; font-size:14px; font-weight:600; }
-.scenario small { display:block; font-size:11px; color:var(--muted); margin-top:3px; }
-.sidebar-note { font-size:11px; color:#928ca3; line-height:1.8; margin-top:22px; padding:0 12px; }
-.panel { background:#121119; border:1px solid var(--line); padding:22px; }
-.panel-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
-h2 { font-size:20px; letter-spacing:-.03em; margin:0 0 4px; }
-.case-index { font:11px ui-monospace,monospace; white-space:nowrap; color:var(--accent); padding:5px 0; }
-.request-strip { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:17px 0; border-bottom:1px solid var(--line); padding-bottom:14px; }
-.metric-label { font-size:11px; color:var(--muted); display:block; margin-bottom:5px; }
-.request-strip strong { font-size:22px; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
-.unit { font-size:11px; font-weight:400; color:#9992ab; margin-left:5px; }
-.balance-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.balance { padding:15px 17px; border:1px solid #615078; background:#211b30; }
-.balance.current { background:#16151e; border-color:var(--line); }
-.balance strong { font-size:36px; line-height:1.2; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
-.balance-tag { display:inline-block; font-size:9px; font-weight:600; color:#c7b7ff; background:#39294e; padding:2px 6px; margin-left:7px; }
-.current .balance-tag { background:#2c2936; color:#c0b9cc; }
-.balance-note { font-size:11px; color:#bbb0ce; margin-top:6px; }
-.equation { font-size:12px; margin:12px 0 0; padding:8px 12px; border-left:2px solid #8b68ef; color:#d0c9df; background:#191520; }
-.action-row { display:flex; align-items:center; gap:15px; margin-top:17px; }
-#run { border:1px solid #8d77ff; background:#6851ec; color:#fff; font-size:13px; font-weight:650; padding:12px 24px; min-height:46px; white-space:nowrap; }
-#run:hover:not(:disabled) { background:#7a63ff; }
-.action-note { font-size:11px; color:var(--muted); }
-.result { margin-top:18px; border-top:1px solid var(--line); overflow:hidden; }
-.result-heading { padding:16px 0 12px; }
-.result-status { font:600 10px ui-monospace,monospace; color:var(--accent); margin-bottom:5px; letter-spacing:.07em; }
-.result h3 { font-size:19px; letter-spacing:-.03em; margin:0 0 6px; }
-.result p { font-size:12px; color:#b8b2c7; }
-.result.good .result-status { color:#96ddbb; }
-.result.detected .result-status { color:#ffc48c; }
-.result.error .result-status { color:#ff9d9d; }
-.checks { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:1fr 1fr; column-gap:24px; }
-.check { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-top:1px solid var(--line); font-size:11px; }
-.check span { color:var(--muted); }
-.check strong { text-align:right; font-weight:500; color:#e3dfeb; }
-.details { margin-top:12px; padding:14px 20px; background:transparent; }
-summary { font-size:12px; font-weight:500; cursor:pointer; color:#b9b0ca; }
-dl { font-size:12px; margin:18px 0; } dt { color:var(--muted); margin-top:12px; }
-dd { margin:3px 0; overflow-wrap:anywhere; font-family:ui-monospace,monospace; }
-pre { max-height:330px; overflow:auto; font-size:11px; background:#0d0c13; padding:14px; }
-footer { font-size:10px; color:#9690a5; padding:16px 0 8px; text-align:right; }
-#load-error:empty { display:none; }
-#load-error { border-left:2px solid #ee8989; color:#ffbdbd; padding:14px; margin-bottom:15px; background:#2c1b24; font-size:13px; }
-@media(min-width:1100px) {
- main { padding-top:24px; } .intro { margin-bottom:22px; } h1 { font-size:34px; }
- article.panel { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); column-gap:24px; }
- .panel-head { grid-column:1 / -1; margin-bottom:6px; }
- .request-strip,.balance-grid,.equation,.action-row { grid-column:1; }
- .balance { padding:13px; } .balance-tag { margin-left:0; display:block; width:fit-content; margin-top:4px; }
- .balance-note { font-size:10px; }
- .action-row { flex-wrap:wrap; gap:8px; }
- .result { grid-column:2; grid-row:2 / span 4; margin-top:17px; border-top:0; border-left:1px solid var(--line); padding-left:22px; }
- .result-heading { padding-top:0; } .result h3 { font-size:23px; line-height:1.4; margin:12px 0; }
- .result p { line-height:1.9; } .checks { grid-template-columns:1fr; margin-top:14px; }
-}
-@media(max-width:800px) {
- .topbar { padding:17px 20px; } .brand span { display:none; } main { padding:24px 20px; }
- .workspace { grid-template-columns:1fr; gap:18px; } .scenario-list { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; }
- .scenario { display:block; padding:10px 8px; border:1px solid var(--line); } .scenario[aria-pressed=true] { border-color:#987cff; }
- .scenario .number,.scenario small,.sidebar-note { display:none; } .scenario strong { font-size:12px; } .section-label { margin-bottom:8px; }
- h1 { font-size:32px; }
-}
-@media(max-width:480px) {
- .topbar { align-items:flex-start; padding:16px; } .environment { justify-content:flex-end; gap:4px; max-width:190px; font-size:9px; }
- .environment span { padding:3px 6px; } main { padding:22px 14px; } h1 { font-size:28px; }
- .intro .muted { font-size:12px; } .eyebrow { font-size:9px; letter-spacing:.09em; }
- .scenario-list { grid-template-columns:repeat(3,minmax(0,1fr)); } .scenario { text-align:center; min-height:43px; }
- .panel { padding:17px; } .panel-head { gap:6px; } h2 { font-size:19px; } .case-index { font-size:10px; }
- .request-strip { gap:12px; margin:17px 0; } .balance-grid { gap:8px; } .balance { padding:13px 10px; }
- .balance strong { font-size:30px; } .balance-tag { display:block; width:fit-content; margin:4px 0 0; }
- .balance-note { font-size:10px; } .equation { font-size:11px; padding:10px; }
- .action-row { align-items:stretch; flex-direction:column; gap:8px; } .action-note { text-align:center; font-size:10px; }
- .checks { grid-template-columns:1fr; } .check strong { max-width:62%; } .details { padding:14px; } footer { text-align:left; }
-}
-</style></head><body>
-<header><div class="topbar"><div class="brand">TRUST404<span>출금 판단 검증</span></div><div class="environment" aria-label="실행 환경"><span id="environment">환경 확인 중</span><span id="aomi">Aomi 상태 확인 중</span></div></div></header>
-<main><div class="intro"><div class="eyebrow">03 / VERIFIABLE OFF-CHAIN DECISIONS</div><h1>그때의 판단, 지금 다시 확인하기</h1><p class="muted">출금이 거절된 이유와 기록이 바뀌거나 빠졌는지를 직접 검증합니다.</p></div><div id="load-error" role="alert"></div>
-<div class="workspace"><aside><p class="section-label">검증할 사례</p><nav id="scenarios" class="scenario-list" aria-label="시연 사례"></nav><p class="sidebar-note">사례를 선택하고 검증 버튼을 누르세요.<br>각 사례의 기록을 실제로 다시 읽습니다.</p></aside><div>
-<article class="panel"><div class="panel-head"><div><h2 id="title">시연 준비 중</h2><p id="description" class="muted">로컬 서버에서 사례를 불러오고 있습니다.</p></div><span class="case-index" id="case-index">— / —</span></div>
-<div class="request-strip"><div><span class="metric-label">출금 요청 금액</span><strong id="amount">—</strong><span class="unit">토큰</span></div><div><span class="metric-label">유지해야 할 최소 잔액</span><strong id="minimum">—</strong><span class="unit">토큰</span></div></div>
-<div class="balance-grid"><div class="balance"><span class="metric-label">접수 당시 잔액<span class="balance-tag">판단의 기준</span></span><strong id="historical">—</strong><span class="unit">토큰</span><p class="balance-note">당시 블록의 상태로 재계산</p></div><div class="balance current"><span class="metric-label">이후 변경된 잔액<span class="balance-tag">비교용</span></span><strong id="current">—</strong><span class="unit">토큰</span><p class="balance-note">잔액 변화는 기록 변조가 아닙니다.</p></div></div>
-<p class="equation" id="equation">출금 후 잔액을 최소 잔액과 비교합니다.</p><div class="action-row"><button id="run" disabled>이 사례 검증하기</button><p class="action-note">기록과 당시 상태를 조회합니다. 실제 출금은 하지 않습니다.</p></div>
-<section id="result" class="result" aria-live="polite" aria-atomic="true"><div class="result-heading"><div class="result-status" id="result-status">실행 전</div><h3 id="result-title">검증을 기다리고 있습니다</h3><p id="result-detail">사례를 선택한 뒤 검증을 실행하세요.</p></div><ul id="checks" class="checks"></ul></section></article>
-<section class="panel details"><details><summary>기록 주소와 원본 검증 결과</summary><dl id="records"></dl><pre id="raw">아직 실행하지 않았습니다.</pre></details></section>
-</div></div><footer>자체 로컬 체인의 시연용 토큰을 사용합니다. 공개 테스트넷 배포와 Aomi 실행은 별도 연결이 필요합니다.</footer></main><script src="/ui.js" defer></script></body></html>
+:root{color-scheme:dark;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0d0c13;color:#e9e6f1;line-height:1.45;--muted:#a39bad;--line:#2b2638;--purple:#b49aff;--green:#8bd6b1;--amber:#f6ba78;--red:#ff969e}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(110deg,#17102355,transparent 60%);min-height:100vh}button{font:inherit;cursor:pointer;color:inherit}button:disabled{opacity:.45;cursor:wait}button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--purple);outline-offset:3px}
+header{border-bottom:1px solid var(--line);padding:14px 26px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-weight:850;font-size:20px;letter-spacing:-.04em}.brand span{color:var(--purple)}.brand small{font:10px ui-monospace,monospace;color:var(--muted);letter-spacing:.12em;margin-left:18px}.env{display:flex;flex-wrap:wrap;gap:8px;font:10px ui-monospace,monospace}.tag{border:1px solid var(--line);padding:5px 8px;color:var(--muted)}
+main{max-width:1600px;margin:auto;padding:22px 26px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}h1{font-size:24px;letter-spacing:-.04em;margin:0}h1 small{font:11px ui-monospace,monospace;color:var(--muted);margin-left:14px}.actions{display:flex;gap:8px}.primary,.secondary{font:600 11px ui-monospace,monospace;letter-spacing:.03em;padding:10px 16px;min-height:38px;border:1px solid #846be8;background:#6b4deb;color:white}.secondary{background:transparent;border-color:#4a405e;color:#d2c6e7}.primary:hover:not(:disabled){background:#7d60ff}.secondary:hover:not(:disabled){background:#241b33}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);margin-bottom:16px}.stat{padding:12px 17px;border-right:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}.stat:last-child{border:0}.label{font:10px ui-monospace,monospace;letter-spacing:.06em;color:var(--muted)}.stat strong{font:24px ui-monospace,monospace}.pass{color:var(--green)!important}.warn{color:var(--amber)!important}.fail{color:var(--red)!important}.unknown{color:var(--purple)!important}
+.panel{border:1px solid var(--line);background:#121017;margin-bottom:14px;min-width:0}.panel-head{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;font:11px ui-monospace,monospace;letter-spacing:.04em;color:#cdc5da}.panel-head small{font-size:10px;color:var(--muted);letter-spacing:0}
+.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;text-align:left;font-size:11px}th{font:10px ui-monospace,monospace;color:var(--muted);font-weight:400;letter-spacing:.03em;background:#15111e;white-space:nowrap}th,td{padding:10px 14px;border-bottom:1px solid #252030}tbody tr:last-child td{border-bottom:0}.matrix{min-width:900px}.matrix tr.selected{background:#21192e}.matrix tr:hover{background:#1c1727}.matrix td:first-child{border-left:2px solid transparent}.matrix tr.selected td:first-child{border-left-color:var(--purple)}.case-button{background:none;border:0;text-align:left;padding:0;color:inherit;font-size:12px;min-height:24px}.case-button small{font:10px ui-monospace,monospace;color:#a193b6;margin-right:10px}.code{font:10px ui-monospace,monospace;white-space:nowrap}.muted{color:var(--muted)}.badge{font:10px ui-monospace,monospace;color:var(--muted);white-space:nowrap}.badge.pass,.badge.warn,.badge.fail,.badge.unknown{font-weight:600}
+.inspector{display:grid;grid-template-columns:1fr 1fr;gap:14px}.inspector .panel{margin:0}.state-table td:nth-child(2),.state-table td:nth-child(3){font-family:ui-monospace,monospace}.state-table td:nth-child(2){color:#c9b4ff}.state-table .big{font-size:23px;line-height:1.1}.context{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0 14px}.context div{padding:10px 0;border-bottom:1px solid #252030;min-width:0}.context dt{font:9px ui-monospace,monospace;color:var(--muted);margin:0 0 5px;letter-spacing:.05em}.context dd{font:11px ui-monospace,monospace;margin:0;overflow-wrap:anywhere}.verdict{padding:14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center}.verdict strong{font:600 16px ui-monospace,monospace}.verdict small{font:10px ui-monospace,monospace;color:var(--muted)}.checks{margin:0;padding:0 14px;list-style:none}.checks li{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #252030;font-size:11px}.checks li:last-child{border:0}.checks span{color:var(--muted)}.checks strong{font:10px ui-monospace,monospace;text-align:right}
+.artifacts{margin-top:14px}.artifacts table{table-layout:fixed}.artifacts th{width:140px}.artifacts td{font:10px ui-monospace,monospace;overflow-wrap:anywhere;color:#c7bdd9;user-select:all}.artifacts td.empty{color:var(--muted)}details{border-top:1px solid var(--line);padding:10px 14px}summary{cursor:pointer;font:10px ui-monospace,monospace;color:#b3a6c5}pre{max-height:330px;overflow:auto;font:11px/1.6 ui-monospace,monospace;color:#c6bfd2;margin:12px 0 0}.footer{display:flex;justify-content:space-between;gap:14px;font:9px ui-monospace,monospace;color:#958bA3;padding-top:2px}.error:empty{display:none}.error{border-left:2px solid var(--red);padding:10px;margin-bottom:14px;color:var(--red);font:11px ui-monospace,monospace}.runtime{padding:10px 14px;border:1px solid var(--line);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:14px;font:10px ui-monospace,monospace}.runtime strong{color:var(--purple);font-weight:500}.runtime span{color:var(--muted)}.runtime button{padding:6px 10px;min-height:30px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:900px){header{padding:14px 18px}.brand small{display:none}main{padding:18px}.inspector{grid-template-columns:1fr}.stat{padding:10px}.stat strong{font-size:21px}.footer{flex-wrap:wrap}.runtime{flex-wrap:wrap}.matrix{min-width:820px}}
+@media(max-width:540px){header{align-items:flex-start;padding:12px}.env{justify-content:flex-end;max-width:220px;font-size:9px;gap:4px}.tag{padding:4px 5px}main{padding:14px 12px}.toolbar{align-items:flex-start;flex-wrap:wrap}h1{font-size:21px}h1 small{display:block;margin:5px 0 0}.actions{width:100%}.actions button{flex:1}.stats{grid-template-columns:1fr 1fr}.stat{border-bottom:1px solid var(--line)}.stat:nth-child(2){border-right:0}.stat:nth-child(3){border-bottom:0}.artifacts th{width:95px}th,td{padding:9px 10px}.panel-head{font-size:10px}.context dd{font-size:10px}.footer{font-size:8px}}
+</style>
+</head>
+<body>
+<header><div class="brand">TRUST<span>404</span><small>SECURITY / AUDIT CONSOLE</small></div><div class="env"><span class="tag" id="environment">CHAIN —</span><span class="tag" id="aomi">AOMI —</span></div></header>
+<main>
+<div class="toolbar"><h1>Decision Audit <small>usdc-reserve-v1 / FIXTURE SUITE</small></h1><div class="actions"><button class="secondary" id="run" disabled>RUN SELECTED</button><button class="primary" id="run-all" disabled>RUN ALL CASES</button></div></div>
+<div id="load-error" class="error" role="alert"></div>
+<div class="stats"><div class="stat"><span class="label">AUDITED / TOTAL</span><strong id="count-done">0 / —</strong></div><div class="stat"><span class="label">VERIFIED</span><strong class="pass" id="count-pass">0</strong></div><div class="stat"><span class="label">FINDINGS</span><strong class="warn" id="count-findings">0</strong></div><div class="stat"><span class="label">INCONCLUSIVE / ERROR</span><strong class="unknown" id="count-unknown">0</strong></div></div>
+<section class="panel"><div class="panel-head"><span>01 / AUDIT MATRIX</span><small id="suite-state" role="status">READY</small></div><div class="table-wrap"><table class="matrix"><thead><tr><th>CASE</th><th>REQUEST</th><th>N → H</th><th>ARCHIVE</th><th>POLICY REPLAY</th><th>REGISTRATION</th><th>FINDING / RESULT</th></tr></thead><tbody id="cases"></tbody></table></div></section>
+<div class="inspector">
+<section class="panel"><div class="panel-head"><span id="selected-title">02 / STATE & POLICY</span><small id="case-index">—</small></div><table class="state-table"><thead><tr><th>STATE VARIABLE</th><th>RECEIPT N</th><th>LATER STATE</th></tr></thead><tbody><tr><td>balance</td><td class="big" id="historical">—</td><td class="big" id="current">—</td></tr><tr><td>request.amount</td><td id="amount">—</td><td class="muted">UNCHANGED</td></tr><tr><td>reserve.floor</td><td id="minimum">—</td><td class="muted">UNCHANGED</td></tr><tr><td>post.balance</td><td id="after-n">—</td><td id="after-current">—</td></tr></tbody></table><dl class="context"><div><dt>POLICY ID</dt><dd id="policy">—</dd></div><div><dt>DECISION WINDOW</dt><dd id="window">—</dd></div><div><dt>RECEIPT BLOCK N</dt><dd id="receipt-block">—</dd></div><div><dt>AUDIT CUTOFF H</dt><dd id="cutoff">—</dd></div></dl></section>
+<section class="panel" id="result" aria-live="polite"><div class="panel-head"><span>03 / VERIFICATION</span><small id="duration">—</small></div><div class="verdict"><strong id="result-title">NOT_RUN</strong><small id="finality">FINALITY —</small></div><ul class="checks" id="checks"></ul><dl class="context"><div><dt>REQUEST → DECISION BATCH</dt><dd id="batches">—</dd></div><div><dt>REGISTRATION DEADLINE</dt><dd id="deadline">—</dd></div><div><dt>AUDIT MODE</dt><dd>FULL LOG / PINNED HASH</dd></div><div><dt>EVIDENCE SOURCE</dt><dd>CHAIN + AUDIT ARCHIVE</dd></div></dl></section>
+</div>
+<section class="panel artifacts"><div class="panel-head"><span>04 / EVIDENCE REFERENCES</span><small>SELECT VALUE TO COPY</small></div><table><tbody id="records"></tbody></table><details><summary>RAW AUDIT JSON</summary><pre id="raw">NOT_RUN</pre></details></section>
+<div class="footer"><span>LOCAL ANVIL · TEST TOKENS · INDEPENDENT RPC AUDIT · NO WITHDRAWAL EXECUTION</span><span>ARCHIVE COMPLETENESS ≠ POLICY CORRECTNESS</span></div>
+</main><script src="/ui.js" defer></script>
+</body></html>

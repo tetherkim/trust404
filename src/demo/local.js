@@ -115,7 +115,9 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
         } else { await rpc('evm_increaseTime', [91]); await rpc('evm_mine', []); }
         // Later balance is 200. Auditing must still use the receipt block's 120.
         await setBalance(200000000n);
-        const asOf = (await reader.at('latest')).context;
+        const view = await reader.at('latest'), asOf = view.context;
+        const requestAnchor = await view.batch('1');
+        const decisionAnchor = decisionTx ? await view.batch('2') : null;
         const auditArchive = new Archive(join(dir, 'audit-copy'));
         for (const id of decisionTx ? ['1', '2'] : ['1']) {
           if (scenario.id === 'unavailable' && id === '2') continue;
@@ -128,6 +130,8 @@ export async function startDemo({ port = 4040, directory = join(root, '.local-de
         writeFileSync(join(dir, 'audit-config.json'), JSON.stringify({ rpcUrl, trustFile: join(dir, 'trust.json'), archiveDirectory: auditArchive.directory }), { mode: 0o600 });
         records.set(scenario.id, { trust, auditArchive, asOf, info: { ...scenario, requestId: request.requestId, anchorAddress,
           requestTransaction: requestTx.transactionHash, decisionTransaction: decisionTx?.transactionHash ?? null,
+          policyId: policy.policyId, policyHash: trust.policyHash, token, treasury,
+          requestAnchor, decisionAnchor, decisionWindowSeconds: policy.decisionWindowSeconds,
           receiptBalance: '120', currentBalance: '200', amount: '50', minimumBalance: '100', asOf } });
       } finally { await closeServer(api); store.close(); }
     }

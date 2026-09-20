@@ -14,6 +14,10 @@ test('local demo creates real records and independently detects all five scenari
   assert.equal(status.aomiConnected, false); assert.equal(status.chainId, 31337); assert.equal(status.scenarios.length, 5);
   const results = {};
   for (const scenario of status.scenarios) {
+    assert.match(scenario.requestAnchor.root, /^0x[0-9a-f]{64}$/);
+    assert(BigInt(scenario.requestAnchor.blockNumber) < BigInt(scenario.asOf.blockNumber));
+    assert.equal(scenario.decisionWindowSeconds, 90);
+    assert.equal(scenario.decisionAnchor === null, scenario.id === 'missing');
     const response = await fetch(`${demo.url}/api/audit/${scenario.id}`); assert.equal(response.status, 200);
     results[scenario.id] = await response.json(); assert.equal(results[scenario.id].asOf.blockHash, scenario.asOf.blockHash);
   }
