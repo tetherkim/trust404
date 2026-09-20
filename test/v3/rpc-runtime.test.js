@@ -4,7 +4,7 @@ import { setupLocalBaseline } from '../../scripts/deploy-local.js';
 import { RpcRuntimeAdapter } from '../../src/v3/rpc-runtime.js';
 import { anchorCall } from '../../src/v3/chain.js';
 
-test('TASK-05: direct RPC Runtime Adapter smoke test (Gate: Block N reproduction & Execution Harness)', async () => {
+test('[TASK-05] 직접 RPC 런타임 어댑터 스모크 테스트 (N번 블록 상태 재현 및 실행 하네스)', async () => {
   const env = await setupLocalBaseline();
   const runtime = new RpcRuntimeAdapter({ rpcUrl: env.rpcUrl });
 

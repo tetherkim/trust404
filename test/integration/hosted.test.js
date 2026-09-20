@@ -16,7 +16,7 @@ async function client(app){
 }
 async function until(fn){for(let i=0;i<100;i++){if(await fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('worker did not settle');}
 
-test('hosted requests enforce auth, origin, amount and idempotency; pause failed work and preserve it across restart',async t=>{
+test('[웹 포털] 인증, Origin, 요청 금액 검증, 멱등성 보장 및 작업 실패 시 일시중지/재시작 복구',async t=>{
  const directory=mkdtempSync(join(tmpdir(),'trust404-hosted-'));mkdirSync(join(directory,'operator'));writeFileSync(join(directory,'operator/trust.json'),'{}');
  let fail=true,calls=0,app;
  const runJob=async()=>{calls++;if(fail)throw Error('private error must not be returned');return {requestId:'verified-request',auditOk:true};};
@@ -41,7 +41,7 @@ test('hosted requests enforce auth, origin, amount and idempotency; pause failed
  assert.equal((await c.call('/api/status',undefined,{cookie:c.cookie+'tampered'})).status,401);
 });
 
-test('hosted queue recovers interrupted work before new work and exports only allowed files',async t=>{
+test('[웹 포털] 중단된 작업 우선 복구 및 허용된 공개 파일만 다운로드 제공',async t=>{
  const directory=mkdtempSync(join(tmpdir(),'trust404-hosted-'));let app;
  t.after(async()=>{await app?.close();rmSync(directory,{recursive:true,force:true});});
  app=await startHostedServer({directory,accessCode:code,port:0,host:'127.0.0.1',runJob:async()=>({})});
@@ -62,7 +62,7 @@ test('hosted queue recovers interrupted work before new work and exports only al
 });
 
 
-test('hosted IDs fit the operator key after the web prefix',async t=>{
+test('[웹 포털] 웹 접두어(web-) 부여 후 오퍼레이터 키 규격 일치 검증',async t=>{
  const directory=mkdtempSync(join(tmpdir(),'trust404-hosted-'));
  mkdirSync(join(directory,'operator'));writeFileSync(join(directory,'operator/trust.json'),'{}');
  const app=await startHostedServer({directory,accessCode:code,port:0,host:'127.0.0.1',runJob:async()=>({})});
@@ -72,7 +72,7 @@ test('hosted IDs fit the operator key after the web prefix',async t=>{
  assert.equal((await c.call('/api/requests',{id:'a'.repeat(76),amount:'1'})).status,202);
 });
 
-test('expired portal session restores login and stops polling',async()=>{
+test('[웹 포털] 세션 만료 시 로그인 화면 복원 및 폴링 중단 검증',async()=>{
  const elements=new Map();const timers=[];
  const document={getElementById(id){if(!elements.has(id))elements.set(id,{hidden:id==='login-panel',addEventListener(){}});return elements.get(id);}};
  const context={document,sessionStorage:{getItem:()=>null},fetch:async()=>({ok:false,status:401,json:async()=>({error:'LOGIN_REQUIRED'})}),clearTimeout(){},setTimeout:fn=>timers.push(fn)};
@@ -85,7 +85,7 @@ test('expired portal session restores login and stops polling',async()=>{
 });
 
 
-test('portal distinguishes saved records from audit success and finality',()=>{
+test('[웹 포털] 저장 완료 상태와 감사 성공 및 체인 완결성(Finality) 구분 표시 검증',()=>{
  const context={document:{getElementById:()=>({addEventListener(){}})},sessionStorage:{getItem:()=>null},fetch:()=>new Promise(()=>{})};
  runInNewContext(readFileSync(new URL('../../src/hosted/portal.js',import.meta.url),'utf8'),context);
  const result={auditOk:false,finality:'PROVISIONAL',requestAudit:{decisions:[{record:'VALID',policy:'MATCH'}]}};

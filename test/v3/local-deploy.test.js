@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setupLocalBaseline } from '../../scripts/deploy-local.js';
 
-test('TASK-04: Deploy CreditState & RecordAnchor to Anvil, capture Block N baseline, and verify RPC reads', async () => {
+test('[TASK-04] 로컬 Anvil 체인 배포: CreditState 및 RecordAnchor 배포, N번 블록 기준선 캡처, RPC 조회 검증', async () => {
   const env = await setupLocalBaseline();
   try {
     assert.ok(env.creditStateAddress, 'creditStateAddress should be set');

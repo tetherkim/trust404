@@ -23,7 +23,7 @@ async function freePort() {
   const s = createServer(); s.listen(0, '127.0.0.1'); await once(s, 'listening');
   const port = s.address().port; await new Promise(r => s.close(r)); return port;
 }
-test('HTTP → SQLite/archive → deployed anchor → independent RPC audit detects attacks', { timeout: 30000 }, async t => {
+test('[E2E 파이프라인] HTTP 요청 접수 → SQLite/아카이브 저장 → 컨트랙트 앵커링 → 독립 RPC 감사 및 공격 탐지', { timeout: 30000 }, async t => {
   const port = await freePort(), url = `http://127.0.0.1:${port}`;
   const anvil = spawn('anvil', ['--host', '127.0.0.1', '--port', String(port), '--silent'], { stdio: 'ignore' });
   t.after(async () => { if (anvil.exitCode === null) { anvil.kill(); await once(anvil, 'exit'); } });

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 const cli = new URL('../src/cli.js', import.meta.url).pathname;
 const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
-test('R7,R8: demo, offline verification, deletion and CLI failures', () => {
+test('[R7,R8] CLI 도구: 오프라인 단건 검증, 전체 감사, 삭제 탐지 및 오류 처리 검증', () => {
   const temp = mkdtempSync(join(tmpdir(), 'trust404-test-'));
   try {
     const out = join(temp, 'demo');

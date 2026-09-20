@@ -12,7 +12,7 @@ import { hash, canonical, sign } from '../../src/v3/crypto.js';
 import { scope, requestRecord, receiptRef } from '../../src/v3/policy.js';
 import { verifyOne } from '../../src/v3/verify.js';
 
-test('TASK-06 to TASK-09: State Mutation Demo & Two-Layer Verification with direct RPC', async () => {
+test('[TASK-06~09] 상태 변경 시연 및 2계층 검증: 담보/부채 변동에 따른 거절 사유 변화 및 Replay 검증', async () => {
   const env = await setupLocalBaseline();
   const runtime = new RpcRuntimeAdapter({ rpcUrl: env.rpcUrl });
   const deployerKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';

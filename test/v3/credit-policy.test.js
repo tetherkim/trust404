@@ -66,7 +66,7 @@ function creditFixture() {
   return { trust, requester, institution, alice, createRequest, creditStateAddress };
 }
 
-test('TASK-02: evaluatePolicy evaluates deterministic lending eligibility correctly', () => {
+test('[TASK-02] LTV 신용 정책 평가: 결정론적 대출 자격 적격/부적격 평가 검증', () => {
   const policy = { maxLtvBps: '7000' };
 
   // 1. Collateral 100, Debt 0, Borrow 80 => LTV 80% > 70% -> REJECTED (LTV_EXCEEDED)
@@ -105,7 +105,7 @@ test('TASK-02: evaluatePolicy evaluates deterministic lending eligibility correc
   }
 });
 
-test('TASK-03: StateSnapshot and DecisionRecord schema and validation', async () => {
+test('[TASK-03] 상태 스냅샷 및 결정 레코드 스키마 무결성 검증', async () => {
   const f = creditFixture();
   const request = f.createRequest('80');
 

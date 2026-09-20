@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { get } from 'node:http';
 import { startDemo } from '../../src/demo/local.js';
 
-test('local demo creates real records and independently detects all five scenarios', { timeout: 30000 }, async t => {
+test('[로컬 시연] 실제 레코드 생성 및 5가지 시나리오(정상 거절, 변조, 유실, 미등록, 불일치) 독립 탐지 검증', { timeout: 30000 }, async t => {
   const directory = mkdtempSync(join(tmpdir(), 'trust404-demo-test-'));
   const demo = await startDemo({ port: 0, directory, deploymentPublisher: '0xcfFb0eEd0e42876470Af1451BC3d4e3F865bB987' });
   t.after(async () => { await demo.close(); rmSync(directory, { recursive: true, force: true }); });

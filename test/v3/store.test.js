@@ -9,7 +9,7 @@ import { canonical } from '../../src/v3/crypto.js';
 import { verifyOne, auditAll } from '../../src/v3/verify.js';
 import { fixture, FakeChain } from './fixtures.js';
 
-test('SQLite restart preserves idempotency, frozen batches and independent archive', async t => {
+test('SQLite 저장소: 프로세스 재시작 시 멱등성 유지, 동결된 배치 및 독립 아카이브 보존', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'trust404-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const f = fixture(), chain = new FakeChain(), archive = new Archive(join(dir, 'archive')), db = join(dir, 'records.sqlite');
   let store = new EvidenceStore(db, archive, f.trust);
@@ -26,7 +26,7 @@ test('SQLite restart preserves idempotency, frozen batches and independent archi
   assert.equal((await verifyOne(store.bundle(request.requestId), f.trust, chain)).ok, true);
   store.close(); assert.equal((await auditAll(archive, f.trust, chain)).ok, true);
 });
-test('HTTP writes require authentication and canonical payloads', async t => {
+test('HTTP API: 쓰기 요청 시 인증(Bearer) 및 정규 페이로드 필수 검증', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'trust404-http-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const f = fixture(), store = new EvidenceStore(join(dir, 'records.sqlite'), new Archive(join(dir, 'archive')), f.trust);
   const token = 'a'.repeat(32), server = createEvidenceServer({ store, reader: {}, writeToken: token });
@@ -39,7 +39,7 @@ test('HTTP writes require authentication and canonical payloads', async t => {
   assert.equal((await fetch(url, { method: 'POST', headers, body: JSON.stringify(record, null, 2) })).status, 400);
 });
 
-test('publisher mismatch after a fork blocks subsequent batch preparation', async t => {
+test('체인 포크/등록자(Publisher) 불일치 시 후속 배치 준비 차단 검증', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'trust404-fork-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const f = fixture(), chain = new FakeChain(), archive = new Archive(join(dir, 'archive'));
   const store = new EvidenceStore(join(dir, 'records.sqlite'), archive, f.trust); t.after(() => store.close());

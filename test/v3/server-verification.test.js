@@ -25,7 +25,7 @@ async function closeServer(server) {
   }
 }
 
-test('TASK-10: GET /v3/requests/:id/verification endpoint returns two-layer verification JSON', async () => {
+test('[TASK-10] HTTP 엔드포인트: GET /v3/requests/:id/verification 2계층 검증 JSON 반환 검증', async () => {
   const env = await setupLocalBaseline();
   const runtime = new RpcRuntimeAdapter({ rpcUrl: env.rpcUrl });
   const deployerKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';

@@ -15,7 +15,7 @@ import {startAuditServer} from '../../src/demo/audit-server.js';
 import {Operator} from '../../src/operator/run.js';
 import {canonical} from '../../src/v3/crypto.js';
 
-test('automatic operator handles three requests, replay and process restart without duplicate batches', {timeout:60000}, async t=>{
+test('[오퍼레이터 데몬] 복수 요청 처리, 상태 재생, 프로세스 재시작 시 중복 배치 없이 안정적 복구', {timeout:60000}, async t=>{
  const socket=createServer();socket.listen(0,'127.0.0.1');await once(socket,'listening');const port=socket.address().port;await new Promise(r=>socket.close(r));
  const rpcUrl=`http://127.0.0.1:${port}`,anvil=spawn('anvil',['--port',String(port),'--silent'],{stdio:'ignore'});
  const dir=mkdtempSync(join(tmpdir(),'trust404-op-'));let op;

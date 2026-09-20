@@ -6,7 +6,7 @@ const fixture=(height,count=2)=>{
  const finalized={count:async()=>count,finality:'FINALIZED'};
  return {at:async tag=>tag==='latest'?latest:finalized,rpc:async()=>({number:'0x'+height.toString(16),hash:'finalized'})};
 };
-test('promotes only when finalized contains every batch',async()=>{
+test('체인 완결성: finalized 블록이 모든 배치를 포함할 때만 승격(Promote)',async()=>{
  assert.equal((await auditView(fixture(99))).finality,'PROVISIONAL');
  assert.equal((await auditView(fixture(100))).finality,'FINALIZED');
  assert.equal((await auditView(fixture(100,1))).finality,'PROVISIONAL');
