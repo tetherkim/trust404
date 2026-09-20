@@ -1,0 +1,11 @@
+*
+!Dockerfile
+!package.json
+!package-lock.json
+!foundry.toml
+!contracts/
+!contracts/**
+!src/
+!src/**
+!examples/
+!examples/**

@@ -12,7 +12,8 @@
     "check:testnet": "node scripts/check-base-sepolia.js",
     "check:aomi": "node scripts/check-aomi.js",
     "operator": "node src/operator/run.js",
-    "audit:serve": "node src/demo/audit-server.js"
+    "audit:serve": "node src/demo/audit-server.js",
+    "serve": "node src/hosted/server.js"
   },
   "engines": {
     "node": ">=22.22.2"

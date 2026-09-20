@@ -126,7 +126,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
  try{
   if(command==='request'){
     // A separate producer can enqueue while the worker holds its single-writer lock.
-    const dir=resolve('.local-demo/operator'),id=process.argv[4];
+    const dir=resolve(process.env.OPERATOR_DIR??'.local-demo/operator'),id=process.argv[4];
     check(/^[a-zA-Z0-9_-]{1,80}$/.test(id??''),'IDEMPOTENCY_KEY_REQUIRED');
     const trust=JSON.parse(readFileSync(join(dir,'trust.json'))),secrets=JSON.parse(readFileSync(join(dir,'secrets.json'))),p=trust.policy,amount=process.argv[3];
     check(/^[1-9][0-9]*$/.test(amount??''),'INVALID_AMOUNT');
@@ -135,7 +135,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
     else{const record=requestRecord({...scope(p),requesterId:'requester',institutionId:p.institutionId,token:p.token,treasury:p.treasury,recipient:p.treasury,amountAtomic:amount,createdAtMs:String(Date.now()),policyHash:trust.policyHash},'requester',secrets.requester.private);const temp=file+'.'+process.pid+'.tmp';writeFileSync(temp,JSON.stringify(record),{flag:'wx',mode:0o600,flush:true});try{linkSync(temp,file);}finally{unlinkSync(temp);}console.log(JSON.stringify({requestId:record.requestId,queued:true}));}
     process.exit(0);
   }
-  op=new Operator('.local-demo/operator');const identity=op.init();
+  op=new Operator(process.env.OPERATOR_DIR??'.local-demo/operator');const identity=op.init();
   if(command==='init'||command==='status')console.log(JSON.stringify({...identity,balanceWei:String(await op.client.getBalance({address:identity.address})),deployed:op.has('trust.json')}));
   else if(command==='deploy')console.log(JSON.stringify({anchor:await op.deploy()}));
   else{

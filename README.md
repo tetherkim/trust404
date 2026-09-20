@@ -124,6 +124,39 @@ npm run audit:serve -- received/demo-1/profiles.json
 
 `.local-demo/operator` 전체는 공유하거나 삭제하지 마세요. 이 폴더에는 개인키·인증 세션·DB·거래 복구 기록이 있습니다. 시연용 키는 권한 0600의 평문 파일로 저장되며 운영용 보안 저장소가 아닙니다. 실행 중인 worker는 하나만 유지하고, 강제 종료 후 잠금이 남으면 해당 프로세스 종료 여부를 확인한 뒤 `operator.lock`만 제거합니다.
 
+## 6. 설치 없이 접속하는 서버 배포 준비
+
+`src/hosted/`에 요청 입력 → Aomi 처리 → 파일 다운로드 → 감사 화면을 연결한 서버가 있습니다. **현재 공개 서버는 생성하지 않았습니다.** Docker 이미지와 Render 설정만 준비되어 있으며, 기존 기능 브랜치에서 배포합니다.
+
+- 화면·API·대기열·작업 처리를 한 서버에서 실행하고 `/var/data` 디스크에 기록·개인키·Aomi 세션을 유지합니다.
+- 팀 접속 코드가 있어야 요청·자료에 접근할 수 있습니다. 모든 참가자가 보는 공유 시연 공간이며, 개인별 계정이나 실제 고객 서명 기능은 아닙니다.
+- 요청은 하나씩 처리합니다. 24시간 동안 최대 20건, 대기·실행·실패 합계 5건, 요청당 최대 10,000 USDC입니다. 기존 거래 가스 예산도 적용합니다.
+- 실패하면 다음 요청 처리를 멈추고 같은 요청을 재개합니다. 수동 재개는 누적 시도 횟수 3회 미만일 때만 가능하며, 해결되지 않으면 운영자가 journal을 확인합니다. 서버 중단 시 실행 중인 요청은 재시작 후 같은 ID로 재개합니다. 강제 종료로 운영 지갑의 잠금이 남았다면 프로세스 종료 여부부터 확인해야 합니다.
+
+### 운영자가 최초 한 번 할 일
+
+1. Render 계정을 준비하고 **New → Blueprint**에서 이 저장소의 `feat/anchored-decision-audit` 브랜치를 연결합니다. `render.yaml`은 **유료 웹 서비스와 1GB 영속 디스크**를 사용하므로 생성 전에 표시되는 요금을 확인합니다. [영속 디스크 안내](https://render.com/docs/disks)
+2. 배포가 끝나면 생성된 `DEMO_ACCESS_CODE`를 안전하게 확인합니다. 기본 주소는 Render의 `RENDER_EXTERNAL_URL`을 사용합니다. 커스텀 도메인이면 `PUBLIC_ORIGIN=https://실제주소`도 설정합니다.
+3. 서비스의 Shell에서 다음 명령으로 **서버 전용 지갑**을 만듭니다. 개인키는 화면에 출력하지 않습니다.
+
+```sh
+npm run operator -- init
+```
+
+4. 출력된 주소에 Base Sepolia test ETH를 충전한 뒤 같은 Shell에서 실행합니다. 이때까지 화면의 요청 접수는 비활성화됩니다.
+
+```sh
+npm run operator -- status
+npm run operator -- deploy
+```
+
+5. 서비스 주소와 접속 코드를 팀원에게 전달합니다. 팀원은 금액만 입력하며, 최초 요청 때 서버가 Aomi에 로그인합니다. 각자 지갑·Foundry·test ETH를 준비할 필요가 없습니다.
+6. 새 요청이 실제 Aomi 경유로 등록되고 다운로드한 파일이 감사되는지 확인한 뒤 공개 시연에 사용합니다. 아직 이 호스팅 환경에서의 검증은 완료하지 않았습니다.
+
+서버는 **한 인스턴스만** 실행합니다. 디스크를 삭제하면 키와 증거를 잃습니다. 이미지에는 로컬 `.env`, 개인키, DB, Aomi 세션을 포함하지 않습니다. 기존 로컬 키를 옮기지 않고 서버에서 별도 지갑·계약을 만드는 절차입니다.
+
+Docker로 직접 확인할 때는 `docker build -t trust404-demo .`로 빌드하고, `DEMO_ACCESS_CODE`(24자 이상), `PUBLIC_ORIGIN`, `/var/data` 영속 볼륨을 설정해 컨테이너의 8080 포트를 연결합니다. `DATA_DIR`과 `OPERATOR_DIR` 기본값은 각각 `/var/data`, `/var/data/operator`입니다. 운영 중인 worker와 별도 수동 등록 명령을 동시에 실행하지 마세요.
+
 ## 코드 위치와 실행 근거
 
 | 경로 | 역할 |
@@ -133,6 +166,7 @@ npm run audit:serve -- received/demo-1/profiles.json
 | `src/v3/store.js`, `src/v3/policy.js` | 기록 저장과 정책 판단 |
 | `src/v3/verify.js` | 독립 감사 |
 | `src/demo/audit-server.js` | 파일 가져오기 서버 |
+| `src/hosted/`, `Dockerfile`, `render.yaml` | 공유 요청 화면·영속 대기열·배포 설정 |
 | `examples/aomi-base-sepolia/` | 실제 공개 시연 자료와 `execution-check.json` 검증 기록 |
 
 실제 Aomi 경유 거래: [요청 등록](https://sepolia.basescan.org/tx/0xa9f05001d2efd00adb2a2e4af2e7c36863be2cd024311baa28bf77e4a4d6335b) · [판단 등록](https://sepolia.basescan.org/tx/0xe1aa2ff6408a937c7fbb5dc540902ed3d380db5ef3b5b5e8a40441754b4cd43e).

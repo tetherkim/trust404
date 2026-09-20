@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import {startHostedServer} from '../../src/hosted/server.js';
+
+const code='test-only-access-code-32-characters';
+async function client(app){
+ const base=`http://127.0.0.1:${app.server.address().port}`;
+ const login=await fetch(base+'/api/login',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({code})});
+ assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];
+ return {base,cookie,call:(path,body,headers={})=>fetch(base+path,{method:body===undefined?'GET':'POST',headers:{cookie,origin:base,'content-type':'application/json',...headers},...(body===undefined?{}:{body:JSON.stringify(body)})})};
+}
+async function until(fn){for(let i=0;i<100;i++){if(await fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('worker did not settle');}
+
+test('hosted requests enforce auth, origin, amount and idempotency; pause failed work and preserve it across restart',async t=>{
+ const directory=mkdtempSync(join(tmpdir(),'trust404-hosted-'));mkdirSync(join(directory,'operator'));writeFileSync(join(directory,'operator/trust.json'),'{}');
+ let fail=true,calls=0,app;
+ const runJob=async()=>{calls++;if(fail)throw Error('private error must not be returned');return {requestId:'verified-request',auditOk:true};};
+ t.after(async()=>{await app?.close();rmSync(directory,{recursive:true,force:true});});
+ app=await startHostedServer({directory,accessCode:code,port:0,host:'127.0.0.1',runJob});let c=await client(app);
+ assert.equal((await fetch(c.base+'/api/status')).status,401);
+ assert.equal((await c.call('/api/requests',{id:'request-0001',amount:'150000000'},{origin:'https://attacker.example'})).status,403);
+ assert.equal((await c.call('/api/requests',{id:'request-0001',amount:'0'})).status,400);
+ assert.equal((await c.call('/api/requests',{id:'request-0001',amount:'150000000'})).status,202);
+ await until(async()=> (await (await c.call('/api/status')).json()).paused);
+ assert.equal((await c.call('/api/requests',{id:'request-0001',amount:'150000000'})).status,200);
+ assert.equal((await c.call('/api/requests',{id:'request-0001',amount:'1'})).status,400);
+ assert.equal(calls,1);
+ const failed=(await (await c.call('/api/status')).json()).jobs[0];assert.equal(failed.error,'EXECUTION_FAILED');assert.equal(failed.attempts,1);
+ await app.close();app=null;
+ app=await startHostedServer({directory,accessCode:code,port:0,host:'127.0.0.1',runJob});c=await client(app);
+ assert.equal((await (await c.call('/api/status')).json()).paused,true);assert.equal(calls,1);
+ fail=false;assert.equal((await c.call('/api/jobs/request-0001/retry',{})).status,202);
+ await until(async()=> (await (await c.call('/api/status')).json()).jobs[0].state==='done');assert.equal(calls,2);
+ assert.equal((await c.call('/api/jobs/request-0001/files/secrets.json')).status,403);
+ assert.equal((await c.call('/api/jobs/request-0001/files/../../secrets.json')).status,404);
+ assert.equal((await c.call('/api/status',undefined,{cookie:c.cookie+'tampered'})).status,401);
+});
+
+test('hosted queue recovers interrupted work before new work and exports only allowed files',async t=>{
+ const directory=mkdtempSync(join(tmpdir(),'trust404-hosted-'));let app;
+ t.after(async()=>{await app?.close();rmSync(directory,{recursive:true,force:true});});
+ app=await startHostedServer({directory,accessCode:code,port:0,host:'127.0.0.1',runJob:async()=>({})});
+ let c=await client(app);assert.equal((await c.call('/api/requests',{id:'request-0002',amount:'1'})).status,400);
+ await app.close();app=null;
+ const db=new DatabaseSync(join(directory,'jobs.sqlite'));db.prepare("INSERT INTO jobs(id,amount,state,created) VALUES ('request-0002','1','running',1)").run();db.close();
+ const files=join(directory,'operator/exports/web-request-0002');mkdirSync(files,{recursive:true});writeFileSync(join(files,'audit.json'),'{"proof":"public"}');
+ let calls=0;app=await startHostedServer({directory,accessCode:code,port:0,host:'127.0.0.1',runJob:async()=>{calls++;return {auditOk:true};}});c=await client(app);
+ await until(async()=> (await (await c.call('/api/status')).json()).jobs[0].state==='done');
+ assert.equal(calls,1);const download=await c.call('/api/jobs/request-0002/files/audit.json');assert.equal(download.status,200);assert.deepEqual(await download.json(),{proof:'public'});
+});

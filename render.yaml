@@ -1,0 +1,21 @@
+# Paid service + persistent disk. Create only after reviewing the provider's charges.
+services:
+  - type: web
+    name: trust404-demo
+    runtime: docker
+    repo: https://github.com/tetherkim/trust404
+    branch: feat/anchored-decision-audit
+    plan: starter
+    healthCheckPath: /healthz
+    numInstances: 1
+    envVars:
+      - key: DEMO_ACCESS_CODE
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data
+      - key: OPERATOR_DIR
+        value: /var/data/operator
+    disk:
+      name: trust404-data
+      mountPath: /var/data
+      sizeGB: 1
